@@ -1,0 +1,35 @@
+appId: local.sobesych.practice
+productName: Sobesych Practice
+directories:
+  output: release-practice-install
+files:
+  - dist-practice/**
+  - src/transcript.mjs
+  - src/domain-knowledge.mjs
+  - src/practice-score.mjs
+  - electron/**
+  - server.mjs
+  - package.json
+  - node_modules/**
+  - LICENSE
+extraMetadata:
+  practiceOnly: true
+  productName: Sobesych Practice
+extraResources:
+  - from: vendor/local-stt
+    to: local-stt
+win:
+  icon: electron/app.ico
+  artifactName: Sobesych-Practice-Setup-${version}-${arch}.${ext}
+  target:
+    - target: nsis
+      arch:
+        - x64
+nsis:
+  oneClick: true
+  perMachine: false
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Sobesych Practice
+  runAfterFinish: false
+  deleteAppDataOnUninstall: false

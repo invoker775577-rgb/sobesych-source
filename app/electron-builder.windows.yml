@@ -1,0 +1,53 @@
+appId: local.sobesych.app
+productName: Sobesych
+publish:
+  provider: github
+  owner: invoker775577-rgb
+  repo: sobesych-releases
+  releaseType: release
+  private: false
+directories:
+  output: release-installer
+files:
+  - dist/**
+  - src/transcript.mjs
+  - src/domain-knowledge.mjs
+  - src/practice-score.mjs
+  - electron/**
+  - scripts/install-local-stt.ps1
+  - server.mjs
+  - package.json
+  - node_modules/**
+  - LICENSE
+extraMetadata:
+  practiceOnly: false
+extraResources:
+  - from: vendor/local-stt-cpu
+    to: local-stt
+    filter:
+      - ggml-large-v3-turbo-q5_0.bin
+      - cpu/Release/*.dll
+      - cpu/Release/whisper-server.exe
+electronLanguages:
+  - en-US
+  - ru
+asarUnpack:
+  - electron/screen-language.ps1
+  - scripts/install-local-stt.ps1
+win:
+  icon: electron/app.ico
+  artifactName: Sobesych-Setup-${version}-${arch}.${ext}
+  target:
+    - target: nsis
+      arch:
+        - x64
+nsis:
+  include: build/installer-preflight.nsh
+  oneClick: true
+  perMachine: false
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Sobesych
+  runAfterFinish: false
+  deleteAppDataOnUninstall: false
+  differentialPackage: true

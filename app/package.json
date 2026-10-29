@@ -1,0 +1,107 @@
+{
+  "name": "sobesych",
+  "license": "MIT",
+  "private": true,
+  "version": "0.5.80",
+  "productName": "Sobesych",
+  "type": "module",
+  "main": "electron/main.cjs",
+  "scripts": {
+    "dev": "npm run desktop",
+    "dev:web": "vite",
+    "dev:api": "node server.mjs",
+    "desktop": "concurrently -k \"npm:dev:web\" \"wait-on http://localhost:5173 && cross-env SOBESYCH_DEV_SERVER_URL=http://localhost:5173 electron .\"",
+    "build": "tsc -b && vite build",
+    "build:practice": "tsc -b && vite build --mode practice",
+    "prepare:local-stt": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/install-cpu-stt.ps1",
+    "prepare:local-stt:gpu": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/install-local-stt.ps1",
+    "lint": "oxlint",
+    "preview": "vite preview",
+    "test": "node --test tests/capture.test.mjs tests/local-stt.test.mjs tests/practice-bank.test.mjs tests/practice-import.test.mjs tests/practice-voice.test.mjs tests/release-config.test.mjs tests/usage.test.mjs tests/updates.test.mjs tests/clean-releases.test.mjs tests/release-source.test.mjs tests/rollback.test.mjs",
+    "test:controls": "npm run build && node tests/answer-controls.mjs",
+    "test:local-stt:regression": "node tests/local-stt-regression.mjs",
+    "dist:win": "npm run prepare:local-stt && npm run lint && npm test && npm run build && electron-builder --win portable --x64 --publish never",
+    "dist:setup:win": "npm run prepare:local-stt && npm run lint && npm test && npm run build && electron-builder --config electron-builder.windows.yml --win nsis --x64 --publish never && node scripts/verify-release.mjs release-installer/win-unpacked",
+    "dist:practice:win": "npm run prepare:local-stt:gpu && npm run lint && npm test && npm run build:practice && electron-builder --config electron-builder.practice.yml --win nsis --x64 --publish never"
+  },
+  "build": {
+    "appId": "local.sobesych.app",
+    "productName": "Sobesych",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**",
+      "src/transcript.mjs",
+      "src/domain-knowledge.mjs",
+      "src/practice-score.mjs",
+      "electron/**",
+      "scripts/install-local-stt.ps1",
+      "server.mjs",
+      "package.json",
+      "node_modules/**",
+      "LICENSE"
+    ],
+    "extraResources": [
+      {
+        "from": "vendor/local-stt-cpu",
+        "to": "local-stt",
+        "filter": [
+          "ggml-large-v3-turbo-q5_0.bin",
+          "cpu/Release/*.dll",
+          "cpu/Release/whisper-server.exe"
+        ]
+      }
+    ],
+    "asarUnpack": [
+      "electron/screen-language.ps1",
+      "scripts/install-local-stt.ps1"
+    ],
+    "electronLanguages": [
+      "en-US",
+      "ru"
+    ],
+    "win": {
+      "icon": "electron/app.ico",
+      "target": [
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "Sobesych-${version}-${arch}.${ext}"
+    }
+  },
+  "dependencies": {
+    "@ozymandiasthegreat/vad": "2.0.7",
+    "dotenv": "^17.4.2",
+    "electron-updater": "6.8.9",
+    "express": "^5.2.1",
+    "lucide-react": "^1.46.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "semver": "7.8.5"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/node": "^24.13.3",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.7",
+    "@vitejs/plugin-react": "^6.1.1",
+    "concurrently": "^10.0.5",
+    "cross-env": "^10.1.0",
+    "electron": "^44.3.0",
+    "electron-builder": "^26.15.3",
+    "oxlint": "^1.81.0",
+    "playwright": "^1.63.0",
+    "typescript": "~6.0.2",
+    "vite": "^8.3.0",
+    "wait-on": "^9.1.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/invoker775577-rgb/sobesych-source.git"
+  }
+}

@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; cursor: crosshair; user-select: none; }
+    body { background: rgba(0, 0, 0, .18); }
+    #box { position: absolute; display: none; border: 2px solid #74d9ff; background: rgba(116, 217, 255, .12); box-shadow: 0 0 0 1px #122029; pointer-events: none; }
+  </style>
+</head>
+<body>
+  <div id="box"></div>
+  <script type="module">
+    import { selectionBounds } from './region-selection.mjs'
+    const box = document.getElementById('box')
+    let start = null
+    let pointerId = null
+    const reset = () => { start = null; pointerId = null; box.style.display = 'none' }
+    const boundsAt = event => selectionBounds(start, { x: event.clientX, y: event.clientY }, { width: innerWidth, height: innerHeight })
+    window.addEventListener('pointerdown', event => {
+      if (event.button !== 0 || start) return
+      start = { x: event.clientX, y: event.clientY }
+      pointerId = event.pointerId
+      document.body.setPointerCapture(event.pointerId)
+      box.style.width = '0px'
+      box.style.height = '0px'
+      box.style.display = 'block'
+    })
+    window.addEventListener('pointermove', event => {
+      if (!start || event.pointerId !== pointerId) return
+      const bounds = boundsAt(event)
+      if (!bounds) { reset(); return }
+      box.style.left = `${bounds.x}px`
+      box.style.top = `${bounds.y}px`
+      box.style.width = `${bounds.width}px`
+      box.style.height = `${bounds.height}px`
+    })
+    window.addEventListener('pointerup', event => {
+      if (!start || event.pointerId !== pointerId) return
+      const bounds = boundsAt(event)
+      start = null
+      pointerId = null
+      if (bounds && bounds.width >= 20 && bounds.height >= 20) window.region.complete(bounds)
+      else box.style.display = 'none'
+    })
+    window.addEventListener('pointercancel', event => { if (event.pointerId === pointerId) reset() })
+    window.addEventListener('lostpointercapture', event => { if (event.pointerId === pointerId) reset() })
+    window.addEventListener('keydown', event => { if (event.key === 'Escape') window.region.cancel() })
+    window.addEventListener('contextmenu', event => { event.preventDefault(); window.region.cancel() })
+  </script>
+</body>
+</html>
