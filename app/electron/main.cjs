@@ -29,8 +29,8 @@ let updateBusy = false
 let updateCheckTimer
 let overlayMode = false
 let normalBounds = null
+let normalMaximized = false
 let screenCaptureBusy = false
-let privacyRequest = 0
 const requests = new Map()
 const closing = new AbortController()
 function log(stage, message) {
@@ -93,8 +93,8 @@ function cancelRequests(requestId) {
   }
 }
 function createWindow() {
-  mainWindow = new BrowserWindow({ width: 1320, height: 860, minWidth: 560, minHeight: 360, show: !process.env.SOBESYCH_HEADLESS,
-    backgroundColor: '#101214', titleBarStyle: 'hidden', titleBarOverlay: { color: '#191b1e', symbolColor: '#e6e9ed', height: 40 }, title: `${practiceOnlyBuild ? 'Sobesych Practice' : 'Sobesych'} ${app.getVersion()}`, icon: path.join(__dirname, 'app.ico'), webPreferences: { preload: path.join(__dirname, 'preload.cjs'), contextIsolation: true, nodeIntegration: false, backgroundThrottling: false, offscreen: layoutTest, devTools: !practiceOnlyBuild } })
+  mainWindow = new BrowserWindow({ width: 1080, height: 740, minWidth: 560, minHeight: 360, show: !process.env.SOBESYCH_HEADLESS,
+    backgroundColor: '#111116', titleBarStyle: 'hidden', titleBarOverlay: { color: '#17171e', symbolColor: '#edeaf5', height: 34 }, title: `${practiceOnlyBuild ? 'Sobesych Practice' : 'Sobesych'} ${app.getVersion()}`, icon: path.join(__dirname, 'app.ico'), webPreferences: { preload: path.join(__dirname, 'preload.cjs'), contextIsolation: true, nodeIntegration: false, backgroundThrottling: false, offscreen: layoutTest, devTools: !practiceOnlyBuild } })
   mainWindow.setMenuBarVisibility(false)
   mainWindow.webContents.setWindowOpenHandler(({ url }) => { if (/^https?:\/\//.test(url)) void shell.openExternal(url); return { action: 'deny' } })
   mainWindow.webContents.on('will-navigate', event => event.preventDefault())
@@ -109,18 +109,23 @@ function setOverlayMode(enabled) {
   if (Boolean(enabled) === overlayMode) return { ok: true, enabled: overlayMode }
   if (enabled) {
     normalBounds = mainWindow.getBounds()
+    normalMaximized = mainWindow.isMaximized()
+    if (normalMaximized) mainWindow.unmaximize()
     const area = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea
     const width = Math.min(720, area.width)
     const height = Math.min(540, area.height)
-    mainWindow.setBounds({ x: area.x + area.width - width - 24, y: area.y + 24, width, height })
+    const margin = Math.min(24, Math.max(0, area.width - width), Math.max(0, area.height - height))
+    mainWindow.setBounds({ x: area.x + area.width - width - margin, y: area.y + margin, width, height })
     if (!mainWindow.isVisible() && !process.env.SOBESYCH_HEADLESS) mainWindow.showInactive()
-    mainWindow.setAlwaysOnTop(true)
+    mainWindow.setAlwaysOnTop(true, 'pop-up-menu')
     mainWindow.setOpacity(0.82)
   } else {
     mainWindow.setAlwaysOnTop(false)
     mainWindow.setOpacity(1)
     if (normalBounds) mainWindow.setBounds(normalBounds)
+    if (normalMaximized) mainWindow.maximize()
     normalBounds = null
+    normalMaximized = false
   }
   overlayMode = Boolean(enabled)
   return { ok: true, enabled: overlayMode }
@@ -182,7 +187,7 @@ else {
     })
     handle('app:config', () => {
       const { pid: _pid, ...localSpeech } = localStt.status()
-      return { settings: store.publicConfig(), state: store.loadState(), candidateProfiles: store.getCandidateProfiles(), candidateProfilesStatus: store.candidateProfilesStatus(), practiceLibraries: store.getPracticeLibraries(), practiceLibrariesStatus: store.practiceLibrariesStatus(), practiceLibrariesWarning: store.practiceLibrariesWarning(), historyWarning: store.historyWarning(), captureProtected: mainWindow.isContentProtected(), localSpeech, practiceOnly: practiceOnlyBuild, version: app.getVersion() }
+      return { settings: store.publicConfig(), state: store.loadState(), candidateProfiles: store.getCandidateProfiles(), candidateProfilesStatus: store.candidateProfilesStatus(), practiceLibraries: store.getPracticeLibraries(), practiceLibrariesStatus: store.practiceLibrariesStatus(), practiceLibrariesWarning: store.practiceLibrariesWarning(), historyWarning: store.historyWarning(), captureProtected: mainWindow.isContentProtected(), overlayMode, localSpeech, practiceOnly: practiceOnlyBuild, version: app.getVersion() }
     })
     handle('settings:save', update => {
       const settings = store.saveSettings(update)
@@ -244,24 +249,9 @@ else {
       }
       finally { requests.delete(id) }
     })
-    handle('privacy:set', async enabled => {
+    handle('privacy:set', enabled => {
       if (practiceOnlyBuild) throw new Error('Скрытый режим отсутствует в тренировочной версии')
       if (typeof enabled !== 'boolean') throw new Error('Состояние защиты должно быть true или false')
-      const request = ++privacyRequest
-      if (enabled && !mainWindow.isContentProtected()) {
-        const win = mainWindow
-        const { response } = await dialog.showMessageBox(win, {
-          type: 'warning', title: 'Скрытый режим и запись',
-          message: 'Скрытый режим может остановить запись экрана',
-          detail: 'Защита окна Windows может блокировать запись NVIDIA и скрывать окно в OBS. Для записи оставь защиту выключенной. Подсказки и прозрачный оверлей продолжат работать.',
-          buttons: ['Оставить запись доступной', 'Включить скрытый режим', 'Отмена'],
-          defaultId: 0, cancelId: 2, noLink: true,
-        })
-        if (request !== privacyRequest || win.isDestroyed() || mainWindow !== win || ![0, 1].includes(response)) {
-          return { ok: true, enabled: mainWindow?.isContentProtected() || false, cancelled: true }
-        }
-        enabled = response === 1
-      }
       if (mainWindow.isContentProtected() !== enabled) mainWindow.setContentProtection(enabled)
       return { ok: true, enabled: mainWindow.isContentProtected() }
     })

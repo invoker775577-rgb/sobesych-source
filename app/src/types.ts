@@ -17,7 +17,7 @@ export type UpdateState = { phase: 'disabled' | 'idle' | 'checking' | 'available
 declare global {
   interface Window {
     sobesych?: {
-      getConfig(): Promise<Result & { settings: Settings; state: SavedState | null; candidateProfiles: CandidateProfiles; candidateProfilesStatus: 'empty' | 'ready' | 'locked'; practiceLibraries: PracticeLibrary[]; practiceLibrariesStatus: 'empty' | 'ready' | 'locked'; practiceLibrariesWarning?: string; historyWarning?: string; captureProtected?: boolean; localSpeech?: LocalSpeech; practiceOnly: boolean; version: string }>
+      getConfig(): Promise<Result & { settings: Settings; state: SavedState | null; candidateProfiles: CandidateProfiles; candidateProfilesStatus: 'empty' | 'ready' | 'locked'; practiceLibraries: PracticeLibrary[]; practiceLibrariesStatus: 'empty' | 'ready' | 'locked'; practiceLibrariesWarning?: string; historyWarning?: string; captureProtected?: boolean; overlayMode?: boolean; localSpeech?: LocalSpeech; practiceOnly: boolean; version: string }>
       getUpdateState(): Promise<UpdateState>
       checkUpdate(): Promise<UpdateState>
       downloadUpdate(): Promise<UpdateState>

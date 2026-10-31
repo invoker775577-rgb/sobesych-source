@@ -1,6 +1,6 @@
 {
-  "applicationVersion": "0.5.80",
-  "includesUnreleasedFixes": true,
+  "applicationVersion": "0.5.81",
+  "includesUnreleasedFixes": false,
   "hashNormalization": "UTF-8 text CRLF to LF; binary files unchanged",
   "exportPolicy": "Application source and synthetic tests only; no private Git history, profiles, recordings or evidence",
   "files": [
@@ -46,7 +46,7 @@
     },
     {
       "path": "app/electron/main.cjs",
-      "sha256": "68aed54cd6d06ec9583c88d557a282e7d21c1081b1b7df6e3523675e9bc2092a"
+      "sha256": "51745d37065f6f24e0d30eff5ffc3c9359c4dabbbb5f5b1520d466d31ceb3c8f"
     },
     {
       "path": "app/electron/preload.cjs",
@@ -98,11 +98,11 @@
     },
     {
       "path": "app/package-lock.json",
-      "sha256": "3f880e307cd08004f58b7d6155a4d738579d30869b23f1dedee13b138a3640f9"
+      "sha256": "6cd9cc001e8666f95838314234e9ef38fff3398676e9a03027a6c2f17efa68c3"
     },
     {
       "path": "app/package.json",
-      "sha256": "6a542ee1a8030881a9fa2c88ea1973ff8e44c7de1f98a9c29d36aa3a83a07a1f"
+      "sha256": "b28180cdbb0e98cb7f90bbf23c2c2780442eb7685d25a9f2533f300b63ba3e0c"
     },
     {
       "path": "app/public/favicon.svg",
@@ -138,11 +138,11 @@
     },
     {
       "path": "app/src/App.css",
-      "sha256": "53f7a4726ee459d8f900cec7989699f5763d2a77bbeeb907f0402a1275c9a2e2"
+      "sha256": "ed79f260b5cf23c50f1b0f7b0c15479006b9307aae24bb53cd58794cac4d0637"
     },
     {
       "path": "app/src/App.tsx",
-      "sha256": "6b40942d4d3ab18fe73f6276007808f2d1612eca9c117254f70a631c2bb3750e"
+      "sha256": "5d55e58dbbd36cce4ac9f63c67e1df01231f8926b29968a611557a28b5b9557c"
     },
     {
       "path": "app/src/assets/hero.png",
@@ -174,7 +174,7 @@
     },
     {
       "path": "app/src/index.css",
-      "sha256": "695ed4ff870e874d7b0df6fbeae184ecedb7642910a80b6d9959ec61baa81502"
+      "sha256": "739f06242dc1cfe956e337eb61c95984334b015a6bbeec39ccfc158d8995732c"
     },
     {
       "path": "app/src/main.tsx",
@@ -242,7 +242,7 @@
     },
     {
       "path": "app/src/types.ts",
-      "sha256": "1d1eed0991457e9fe32c4c0664fbe8f7f15b1a6811484386df6b8d30f60a3403"
+      "sha256": "6e804071d780024c855e1b908aebea2cf975d6eef27c73cd047a23b969ef033a"
     },
     {
       "path": "app/src/UpdatePanel.tsx",
@@ -266,7 +266,7 @@
     },
     {
       "path": "app/tests/answer-controls.mjs",
-      "sha256": "40f5f249bbc78c91eaa6746a2930192ac080f16cbc8fd6f82e8f00d1d5e2a71b"
+      "sha256": "954a2202ac3b72c92a0268c89910a36c4f3c09cfe90ed57a8a453350ce53a477"
     },
     {
       "path": "app/tests/capture.test.mjs",
@@ -314,7 +314,7 @@
     },
     {
       "path": "app/tests/rollback.test.mjs",
-      "sha256": "84bfe89df70a2290a1ea692b4222381c165a40911721df706810ffc8f124d20b"
+      "sha256": "0b581d6eca36949f4fdd5e07d57b887fe06f28a2913c4793908ec9af1867e419"
     },
     {
       "path": "app/tests/technical-speech-cases.mjs",
@@ -354,7 +354,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "0b04b037bcb3f6039b6a40b1089a6ecd05c8ee877d39a89675d405c849719d81"
+      "sha256": "4dc6581b6c3e769948f09986671dd3f4979cbd651b1d8bf9c52cd54634c732fb"
     },
     {
       "path": "SECURITY.md",

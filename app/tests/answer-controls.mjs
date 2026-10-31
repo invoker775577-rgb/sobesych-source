@@ -15,7 +15,7 @@ delete env.ELECTRON_RUN_AS_NODE
 delete env.PORTABLE_EXECUTABLE_DIR
 delete env.SOBESYCH_DEV_SERVER_URL
 Object.assign(env, { OPENAI_API_KEY: 'controls-fixture-key', OPENAI_BASE_URL: 'http://127.0.0.1:1', SOBESYCH_DATA_DIR: directory, SOBESYCH_HEADLESS: '1', SOBESYCH_SKIP_STT_WARMUP: '1' })
-if (!executable) env.SOBESYCH_LAYOUT_TEST = '1'
+env.SOBESYCH_LAYOUT_TEST = '1'
 let application
 const measurements = []
 const errors = []
@@ -29,7 +29,7 @@ try {
     ipcMain.removeHandler('audio:source')
     ipcMain.handle('audio:source', () => ({ sourceId: 'controls-fixture' }))
     ipcMain.removeHandler('provider:assist')
-    ipcMain.handle('provider:assist', () => ({ answer: 'DNS помогает найти адрес сервера по имени.', usage: { cost: 0 }, model: 'controls-fixture' }))
+    ipcMain.handle('provider:assist', () => ({ answer: 'DNS переводит имя сайта в IP-адрес сервера. Компьютер сначала проверяет свой кэш, а затем спрашивает DNS-сервер.\n\nЕсли сайт открывается только на одном компьютере, сравню ответы nslookup на обоих. Проверю, какой DNS-сервер они используют и нет ли старой записи в кэше или файле hosts. Так можно понять, проблема в DNS или уже в подключении к самому серверу.', usage: { cost: 0 } }))
     ipcMain.removeHandler('local-stt:warm')
     ipcMain.handle('local-stt:warm', () => ({ ok: true, backend: 'cpu', previewEnabled: false }))
   })
@@ -52,14 +52,37 @@ try {
       port = { postMessage: data => queueMicrotask(() => this.port.onmessage?.({ data: { type: 'flushed', id: data.id } })) }
       connect(node) { return node }
     }
-    navigator.mediaDevices.getUserMedia = async constraints => new Stream([track('audio'), ...(constraints.video ? [track('video')] : [])])
+    window.captureAttempts = 0
+    navigator.mediaDevices.getUserMedia = async constraints => {
+      window.captureAttempts++
+      if (window.failCapture) throw new Error('Synthetic device unavailable')
+      return new Stream([track('audio'), ...(constraints.video ? [track('video')] : [])])
+    }
     navigator.mediaDevices.getDisplayMedia = async () => { throw new Error('Physical capture forbidden') }
     navigator.mediaDevices.enumerateDevices = async () => []
     window.AudioContext = Context; window.AudioWorkletNode = Worklet; window.MediaStream = Stream
   })
   await page.reload()
+  await page.getByRole('button', { name: 'Начать звонок', exact: true }).waitFor()
+  assert.equal(await page.getByRole('button', { name: 'Практика', exact: true }).count(), 0)
+  assert.equal(await page.getByRole('button', { name: 'Выделить задачу', exact: true }).count(), 0)
+  assert.equal(await page.locator('.brand img').count(), 0)
+  assert.equal(await page.evaluate(() => window.captureAttempts), 0)
+  assert.equal(await page.evaluate(() => performance.getEntriesByType('resource').some(entry => entry.name.includes('practice-bank'))), false)
+  await page.screenshot({ path: join(directory, 'start.png') })
+  await page.evaluate(() => { window.failCapture = true })
+  await page.getByRole('button', { name: 'Начать звонок', exact: true }).click()
+  await page.getByRole('alert').filter({ hasText: 'Не удалось подключить звук собеседника' }).waitFor()
+  assert.equal(await page.locator('.overlay-shell').count(), 0, 'Failed audio connection must keep the start screen')
+  await page.evaluate(() => { window.failCapture = false })
   await page.getByRole('button', { name: 'Начать звонок', exact: true }).click()
   await page.getByRole('button', { name: 'Пауза', exact: true }).waitFor()
+  await page.locator('.overlay-shell').waitFor()
+  const compact = await application.evaluate(({ BrowserWindow }) => { const win = BrowserWindow.getAllWindows()[0]; return { opacity: win.getOpacity(), onTop: win.isAlwaysOnTop(), protected: win.isContentProtected() } })
+  assert.deepEqual(compact, { opacity: 0.82, onTop: true, protected: false }, 'Explicit call start opens overlay without enabling privacy')
+  await page.screenshot({ path: join(directory, 'call-auto-overlay.png') })
+  await page.getByRole('button', { name: 'Выключить компактный оверлей', exact: true }).click()
+  await page.locator('.shell:not(.overlay-shell)').waitFor()
   await page.getByRole('status', { name: 'Движок распознавания' }).filter({ hasText: 'CPU' }).waitFor()
   const bounds = () => page.locator('.ai-tools').evaluate(element => [...element.querySelectorAll('button')].map(button => {
     const { x, y, width, height } = button.getBoundingClientRect()
@@ -104,10 +127,21 @@ try {
   const clickMs = Math.round(performance.now() - started)
   await page.locator('.answer').waitFor()
   assert.ok(clickMs < 1000, `Idle answer click took ${clickMs} ms`)
+  await page.getByRole('button', { name: 'Включить компактный оверлей', exact: true }).click()
+  await page.locator('.overlay-shell').waitFor()
+  await page.setViewportSize({ width: 720, height: 540 })
+  await page.screenshot({ path: join(directory, 'answer-overlay.png') })
+  await page.getByRole('button', { name: 'Исправить распознанную реплику', exact: true }).click()
+  await page.locator('.shell:not(.overlay-shell)').waitFor()
+  assert.equal(await page.getByRole('textbox', { name: 'Реплика собеседника', exact: true }).inputValue(), questions[1])
+  await page.getByRole('button', { name: 'Включить компактный оверлей', exact: true }).click()
+  await page.locator('.overlay-shell').waitFor()
   await page.getByRole('button', { name: 'Остановить звонок', exact: true }).click()
+  await page.locator('.shell:not(.overlay-shell)').waitFor()
+  assert.equal(await application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].getOpacity()), 1)
   assert.deepEqual(errors, [])
   writeFileSync(join(directory, 'results.json'), JSON.stringify({ completed: true, physicalDevices: false, apiSpendUsd: 0, clickMs, measurements }, null, 2))
-  console.log(`PASS fixed answer/task controls across short and wrapped questions at three viewports and compact overlay. Click ${clickMs} ms. Evidence: ${directory}`)
+  console.log(`PASS start screen, failed audio recovery, automatic compact call without privacy, fixed answer/task controls at three viewports and overlay, stop restores window. Click ${clickMs} ms. Evidence: ${directory}`)
 } catch (error) {
   writeFileSync(join(directory, 'results.json'), JSON.stringify({ completed: false, error: error.message, measurements }, null, 2))
   console.log(`Control layout evidence: ${directory}`)

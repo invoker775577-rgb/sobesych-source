@@ -12,8 +12,8 @@ function files(directory) {
   })
 }
 
-test('0.5.72 runtime stays unchanged outside the scoped audio, recording and installer fixes', () => {
-  const scopedFixFiles = new Set(['src/capture.ts', 'src/types.ts', 'electron/main.cjs', 'electron/preload.cjs', 'electron/updates.cjs', 'electron/local-stt.cjs', 'src/App.tsx', 'src/App.css'])
+test('0.5.72 runtime stays unchanged outside the scoped audio, recording, installer and requested UI changes', () => {
+  const scopedFixFiles = new Set(['src/capture.ts', 'src/types.ts', 'electron/main.cjs', 'electron/preload.cjs', 'electron/updates.cjs', 'electron/local-stt.cjs', 'src/App.tsx', 'src/App.css', 'src/index.css'])
   const actual = [...files('src/'), ...files('electron/'), 'server.mjs'].sort()
   assert.deepEqual(actual, Object.keys(baseline.files).sort())
   for (const path of actual) {

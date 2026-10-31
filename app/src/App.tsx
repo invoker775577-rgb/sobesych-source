@@ -1,10 +1,9 @@
-import { Copy, Download, Eye, EyeOff, History, Mic, MicOff, Monitor, Pause, Pencil, Phone, PictureInPicture2, Play, Scan, Search, Send, Settings as SettingsIcon, Sparkles, Square, Trash2, Upload, Video, Volume2, VolumeX, X } from 'lucide-react'
+import { Copy, Download, Eye, EyeOff, History, Mic, MicOff, Monitor, Pause, Pencil, Phone, PictureInPicture2, Play, Scan, Search, Send, Settings as SettingsIcon, Sparkles, Square, Trash2, Upload, Volume2, VolumeX, X } from 'lucide-react'
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { CaptureSession } from './capture'
 import type { AudioStatus, CaptureStartResult, Source } from './capture'
 import { insertTranscriptMessage, interviewerPreview, isFreshQuestionDraft, isTranscriptNoise, latestInterviewerMessage, normalizeTranscriptText, selectLiveQuestionDraft, selectQuestionFallback } from './transcript.mjs'
 import { createStreamUpdates } from './stream-updates.mjs'
-import { getPracticeQuestion, getPracticeQuestions, getPracticeTrack, getPracticeTracks } from './practice-bank.mjs'
 import { classifyPracticeQuestionAudience, mergePracticeTranscripts } from './practice-import.mjs'
 import { createPracticeUtterance, resolvePracticeTranscriptionLanguage } from './practice-voice.mjs'
 import { extractPracticeScores, summarizePracticeScores } from './practice-score.mjs'
@@ -26,6 +25,7 @@ const maxVisibleTranscriptQuestions = 300
 const maxTranscriptBatchBytes = 10_000_000
 const maxSavedPracticeLibraries = 10
 const practiceOnlyBuild = import.meta.env.MODE === 'practice'
+const emptyPracticeBank: typeof import('./practice-bank.mjs') = { getPracticeQuestion: () => undefined, getPracticeTrack: () => undefined, getPracticeQuestions: () => [], getPracticeTracks: () => [] }
 type LatencyStats = { callId: string; speechToTextMs?: number; speechDurationMs?: number; afterSpeechMs?: number; processingMs?: number; queueMs?: number; transcriptionMs?: number; questionWaitMs?: number; transcriptFinal?: boolean; firstTokenMs?: number; answerMs?: number; buttonToAnswerMs?: number }
 type AudioDiagnostic = { state: 'idle' | 'warming' | 'recording' | 'processing'; text: Record<Source, string>; draft: string; latency: Partial<Record<Source, LatencyStats>>; sources: Record<Source, AudioStatus>; pending: boolean; error: string }
 type StreamingAnswer = { callId: string; text: string; mode: string; status: 'streaming' | 'partial' }
@@ -75,8 +75,8 @@ function usageRecordStatus(record: UsageRecord) {
   if (record.status === 'possibly-charged') return 'Запрос отменён или завершился ошибкой; стоимость неизвестна'
   return 'Провайдер не вернул стоимость'
 }
-function IconButton({ title, action, icon, disabled = false }: { title: string; action: () => void; icon: React.ReactNode; disabled?: boolean }) {
-  return <button className="icon-button" type="button" title={title} aria-label={title} onClick={action} disabled={disabled}>{icon}</button>
+function IconButton({ title, action, icon, disabled = false, pressed, hint }: { title: string; action: () => void; icon: React.ReactNode; disabled?: boolean; pressed?: boolean; hint?: string }) {
+  return <button className="icon-button" type="button" title={hint || title} aria-label={title} aria-pressed={pressed} onClick={action} disabled={disabled}>{icon}</button>
 }
 
 function usePracticeQuestionSpeech(onError: (message: string) => void) {
@@ -153,6 +153,7 @@ const AnswerHistory = memo(function AnswerHistory({ messages }: { messages: Mess
 })
 
 function App() {
+  const [practiceBank, setPracticeBank] = useState(emptyPracticeBank)
   const [data, setData] = useState<SavedState>({ calls: [], profileContext: '', focus: '' })
   const dataRef = useRef(data)
   const [settings, setSettings] = useState(fallbackSettings)
@@ -243,6 +244,7 @@ function App() {
   const [protectedCapture, setProtectedCapture] = useState(false)
   const [privacyBusy, setPrivacyBusy] = useState(false)
   const [overlayMode, setOverlayModeState] = useState(false)
+  const overlayRequest = useRef(0)
   const [modal, setModal] = useState<'settings' | null>(null)
   const [configDraft, setConfigDraft] = useState<Settings & { apiKey: string }>({ ...settings, apiKey: '' })
   const [candidateProfiles, setCandidateProfiles] = useState<CandidateProfiles>({ devops: '', support: '' })
@@ -262,6 +264,12 @@ function App() {
   const transcriptEnd = useRef<HTMLDivElement>(null)
 
   const selected = data.calls.find(c => c.id === selectedId)
+  useEffect(() => {
+    if (!practiceOnlyBuild && selected?.kind !== 'practice') return
+    let alive = true
+    void import('./practice-bank.mjs').then(bank => { if (alive) setPracticeBank(bank) }).catch(error => { if (alive) setError(errorText(error)) })
+    return () => { alive = false }
+  }, [selected?.kind])
   const microphoneAction = micEnabled ? audio.me.active ? 'Выключить микрофон' : 'Подключить микрофон' : 'Включить микрофон'
   const questionPreview = useMemo(() => {
     if (!selected || selected.kind === 'practice') return null
@@ -280,7 +288,7 @@ function App() {
   const practiceNeedsReview = selected?.kind === 'practice' && selected.messages.findLastIndex(m => m.speaker === 'me') > selected.messages.findLastIndex(m => m.speaker === 'assistant')
   const selectedPracticeQuestionSet = selected?.kind === 'practice' ? selected.practiceQuestionSet : undefined
   const selectedPracticePrompt = selected?.kind === 'practice' ? latestInterviewerMessage(selected.messages)?.text || '' : ''
-  const selectedPracticeTrack = selected?.kind === 'practice' && selected.practiceTrackId ? getPracticeTrack(selected.practiceTrackId) : undefined
+  const selectedPracticeTrack = selected?.kind === 'practice' && selected.practiceTrackId ? practiceBank.getPracticeTrack(selected.practiceTrackId) : undefined
   const selectedPracticeTitle = selectedPracticeQuestionSet ? `Из TXT: ${selectedPracticeQuestionSet.title}` : selectedPracticeTrack?.title
   const selectedPracticeQuestionCount = selectedPracticeQuestionSet?.questions.length ?? selectedPracticeTrack?.questionIds.length ?? 0
   const hasPracticeScenario = Boolean(selectedPracticeQuestionSet || selectedPracticeTrack)
@@ -385,6 +393,7 @@ function App() {
       if (!alive) return
       if (config.error) throw new Error(config.error)
       setProtectedCapture(Boolean(config.captureProtected))
+      setOverlayModeState(Boolean(config.overlayMode))
       if (config.historyWarning) setError(config.historyWarning)
       const loadedProfiles = config.candidateProfiles || { devops: '', support: '' }
       if (config.candidateProfilesStatus === 'locked') {
@@ -573,7 +582,7 @@ function App() {
       }
       commit({ ...dataRef.current, calls: [call, ...dataRef.current.calls] })
       liveId.current = call.id; setLiveCallId(call.id); choose(call.id); changePhase('running'); setView('call')
-      if (settingsRef.current.transcriptionMode === 'local' && !localPreviewEnabled.current) setNotice('Распознавание на процессоре. Возможны большие задержки.')
+      await setCompactMode(true)
     } catch (error) {
       void window.sobesych?.releaseLocalTranscription?.()
       setError(errorText(error))
@@ -615,6 +624,7 @@ function App() {
   function stopCall() {
     cancel(); changePhase('idle'); liveId.current = null; setLiveCallId(null)
     void window.sobesych?.releaseLocalTranscription?.()
+    void setCompactMode(false)
     screenTask.current = null
     setNotice('Звонок завершён'); setError('')
     void window.sobesych?.saveState(dataRef.current)
@@ -624,13 +634,14 @@ function App() {
     if (!id || !draft.trim()) return
     append(id, 'interviewer', draft, undefined, 'manual'); clearIncompleteAnswer(); setDraft(''); setDraftSource(null)
   }
-  function editInterviewerPreview() {
+  async function editInterviewerPreview() {
     if (!questionPreview?.text) return
     setDraft(questionPreview.text)
     setDraftSource({
       text: questionPreview.text,
       messageId: questionPreview.state === 'review' ? undefined : questionPreview.messageId,
     })
+    if (overlayMode) await setCompactMode(false)
     requestAnimationFrame(() => document.querySelector<HTMLTextAreaElement>('[aria-label="Реплика собеседника"]')?.focus())
   }
   function createQuietCall() {
@@ -1023,7 +1034,7 @@ function App() {
   }
   function startPracticeTrack() {
     const track = practiceTracks.find(item => item.id === practiceTrackChoice)
-    const firstQuestion = getPracticeQuestion(track?.questionIds[0] || '')
+    const firstQuestion = practiceBank.getPracticeQuestion(track?.questionIds[0] || '')
     if (!track || !firstQuestion || liveCallId || busyRef.current || practiceMicState !== 'idle') return
     const createdAt = new Date().toISOString()
     const call: Call = {
@@ -1040,7 +1051,7 @@ function App() {
     if (!selected || selected.kind !== 'practice' || !hasPracticeScenario || !practiceCanContinue || busyRef.current) return
     stopPracticeQuestionSpeech()
     const nextStep = selectedPracticeStep + 1
-    const nextQuestion = selectedPracticeQuestionSet?.questions[nextStep] || getPracticeQuestion(selectedPracticeTrack?.questionIds[nextStep] || '')?.question
+    const nextQuestion = selectedPracticeQuestionSet?.questions[nextStep] || practiceBank.getPracticeQuestion(selectedPracticeTrack?.questionIds[nextStep] || '')?.question
     if (!nextQuestion) { setNotice('Сценарий завершён'); return }
     append(selected.id, 'interviewer', nextQuestion)
     updateCall(selected.id, call => ({ ...call, practiceTrackStep: nextStep }))
@@ -1073,16 +1084,15 @@ function App() {
       const result = await window.sobesych.setCaptureProtection(enabled)
       if (result.error || !result.ok) throw new Error(result.error || 'Не удалось переключить скрытый режим')
       setProtectedCapture(Boolean(result.enabled))
-      if (!result.cancelled) setNotice(result.enabled ? '' : 'Защита окна от захвата выключена. Sobesych может быть виден на записи.')
     } catch (e) { setError(errorText(e)) } finally { setPrivacyBusy(false) }
   }
-  async function toggleOverlay() {
+  async function setCompactMode(enabled: boolean) {
     if (!window.sobesych) return
+    const request = ++overlayRequest.current
     try {
-      const result = await window.sobesych.setOverlayMode(!overlayMode)
+      const result = await window.sobesych.setOverlayMode(enabled)
       if (result.error) throw new Error(result.error)
-      setOverlayModeState(Boolean(result.enabled))
-      setNotice('')
+      if (request === overlayRequest.current) setOverlayModeState(Boolean(result.enabled))
     } catch (e) { setError(errorText(e)) }
   }
   function openSettings() {
@@ -1227,8 +1237,8 @@ function App() {
   }
   const historyCalls = useMemo(() => practiceOnlyBuild ? data.calls.filter(call => call.kind === 'practice') : data.calls, [data.calls])
   const filtered = useMemo(() => view === 'history' ? historyCalls.filter(c => !search || c.messages.some(m => m.text.toLowerCase().includes(search.toLowerCase())) || new Date(c.createdAt).toLocaleDateString('ru-RU').includes(search)) : [], [historyCalls, search, view])
-  const practiceQuestions = getPracticeQuestions(settings.candidateProfile)
-  const practiceTracks = getPracticeTracks(settings.candidateProfile)
+  const practiceQuestions = practiceOnlyBuild ? practiceBank.getPracticeQuestions(settings.candidateProfile) : []
+  const practiceTracks = practiceOnlyBuild ? practiceBank.getPracticeTracks(settings.candidateProfile) : []
   const practiceQuestionsRu = practiceQuestions.filter(question => question.language === 'ru')
   const practiceQuestionsEn = practiceQuestions.filter(question => question.language === 'en')
   const practiceTracksRu = practiceTracks.filter(track => track.language === 'ru')
@@ -1239,23 +1249,19 @@ function App() {
 
   return <main className={`shell${overlayMode ? ' overlay-shell' : ''}`}>
     <header className="app-header">
-      <strong className="brand"><img src="./favicon.svg" alt="" />Sobesych <small>{version}</small></strong>
+      <strong className="brand">Sobesych <small>{version}</small></strong>
       <nav aria-label="Разделы">
         <button className={view === 'history' ? 'selected' : ''} onClick={() => { stopPracticeQuestionSpeech(); setView('history') }} disabled={practiceMicState !== 'idle'}><History size={16} />История</button>
-        {!practiceOnlyBuild && <button className={view === 'call' ? 'selected' : ''} onClick={() => { if (liveCallId) choose(liveCallId); else if (!selectedId && data.calls[0]) choose(data.calls[0].id); setView('call') }} disabled={!ready || practiceMicState !== 'idle'}><Phone size={16} />{liveCallId ? 'Текущий звонок' : 'Звонок'}</button>}
-        <button className={view === 'practice' ? 'selected' : ''} onClick={() => { stopPracticeQuestionSpeech(); setView('practice') }} disabled={!ready || Boolean(liveCallId) || practiceMicState !== 'idle'}><Sparkles size={16} />Практика</button>
+        {!practiceOnlyBuild && <button className={view === 'call' ? 'selected' : ''} onClick={() => { choose(liveCallId); setView('call') }} disabled={!ready || practiceMicState !== 'idle'}><Phone size={16} />{liveCallId ? 'Текущий звонок' : 'Звонок'}</button>}
+        {practiceOnlyBuild && <button className={view === 'practice' ? 'selected' : ''} onClick={() => { stopPracticeQuestionSpeech(); setView('practice') }} disabled={!ready || Boolean(liveCallId) || practiceMicState !== 'idle'}><Sparkles size={16} />Практика</button>}
       </nav>
       <div className="header-tools">
         {updateAvailable && <button onClick={openSettings} title="Открыть обновление приложения"><Download size={18} />Обновление</button>}
-        {!practiceOnlyBuild && <>{iconButton(protectedCapture ? 'Выключить скрытый режим' : 'Включить скрытый режим', () => void togglePrivacy(), protectedCapture ? <EyeOff size={18} /> : <Eye size={18} />, !ready || privacyBusy || (!protectedCapture && (busy || practiceMicState !== 'idle')))}
-        {iconButton(overlayMode ? 'Выключить компактный оверлей' : 'Включить компактный оверлей', () => void toggleOverlay(), <PictureInPicture2 size={18} />, !ready || practiceMicState !== 'idle')}</>}
+        {!practiceOnlyBuild && <><IconButton title={protectedCapture ? 'Выключить скрытый режим' : 'Включить скрытый режим'} action={() => void togglePrivacy()} icon={protectedCapture ? <EyeOff size={18} /> : <Eye size={18} />} pressed={protectedCapture} hint={`${protectedCapture ? 'Скрытый режим включён' : 'Скрытый режим выключен'}. Защита окна может блокировать запись OBS/NVIDIA.`} disabled={!ready || privacyBusy || (!protectedCapture && (busy || practiceMicState !== 'idle'))} />
+        <IconButton title={overlayMode ? 'Выключить компактный оверлей' : 'Включить компактный оверлей'} action={() => void setCompactMode(!overlayMode)} icon={<PictureInPicture2 size={18} />} pressed={overlayMode} disabled={!ready || practiceMicState !== 'idle'} /></>}
         {iconButton('Настройки', openSettings, <SettingsIcon size={18} />, !ready || practiceMicState !== 'idle')}
       </div>
     </header>
-    {protectedCapture && <div className="global-status capture-warning" role="region" aria-label="Скрытый режим и запись">
-      <span>Скрытый режим включён. Защита окна может мешать записи OBS/NVIDIA.</span>
-      <button onClick={() => void togglePrivacy(false)} disabled={!ready || privacyBusy}><Video size={16} />Разрешить запись</button>
-    </div>}
     {error && <div className="global-status error" role="alert"><span>{error}</span>{iconButton('Закрыть ошибку', () => setError(''), <X size={16} />)}</div>}
     {notice && <div className="global-status notice" role="status"><span>{notice}</span>{iconButton('Закрыть уведомление', () => setNotice(''), <X size={16} />)}</div>}
     {view === 'practice' ? <section className="practice-page">
@@ -1315,7 +1321,7 @@ function App() {
         stopPracticeQuestionSpeech()
         setPracticeTrackChoice(track?.id || '')
         setPracticeQuestionChoice('')
-        const firstQuestion = getPracticeQuestion(track?.questionIds[0] || '')
+        const firstQuestion = practiceBank.getPracticeQuestion(track?.questionIds[0] || '')
         setPracticeQuestion(firstQuestion?.question || '')
         setPracticeAnswer('')
       }}>
@@ -1346,8 +1352,9 @@ function App() {
         {iconButton('Экспорт звонка', () => void window.sobesych!.exportCall(c).then(r => { if (r.error) setError(r.error) }), <Download size={17} />)}
         {iconButton('Удалить звонок', () => setDeleteId(c.id), <Trash2 size={17} />, liveCallId === c.id)}
       </article>)}</div>
-    </section> : !selected ? <section className="history-page"><div className="section-heading"><h1>Звонок</h1></div><div className="main-actions"><button className="primary" onClick={() => void startCall()} disabled={!ready || callStarting}><Mic size={17} />{callStarting ? 'Подготовка распознавания…' : 'Начать звонок'}</button><button onClick={() => void ask('screen')} disabled={!ready || busy || callStarting}><Scan size={17} />Выделить задачу</button></div></section> : <section className="call-page" aria-label="Живой звонок">
+    </section> : !selected ? <section className="start-page" aria-label="Новый звонок"><div className="start-card"><h1>Новый звонок</h1><p>После старта откроется компактное окно с подсказками и задачами с экрана.</p><button className="primary start-button" onClick={() => void startCall()} disabled={!ready || callStarting}><Mic size={18} />{callStarting ? 'Подготовка распознавания…' : 'Начать звонок'}</button><small>{!settings.hasKey ? 'Добавь ключ OpenRouter в настройках для AI-подсказок' : 'Микрофон включится после нажатия'}</small></div></section> : <section className="call-page" aria-label="Живой звонок">
       <div className="call-toolbar"><div className="call-heading"><h1>{selected.kind === 'practice' ? 'Разбор тренировки' : selectedId === liveCallId ? phase === 'paused' ? 'Пауза' : 'Живой звонок' : 'Завершённый звонок'}</h1>{hasPracticeScenario && <small>{selectedPracticeTitle} · Вопрос {selectedPracticeStep + 1} из {selectedPracticeQuestionCount}</small>}</div>
+        {selectedId === liveCallId && settings.transcriptionMode === 'local' && localSpeech?.backend && <span className={`compact-backend ${localSpeech.backend}`} title={localSpeech.backend === 'cpu' ? 'Распознавание на процессоре. Возможны задержки; NVIDIA-пакет можно скачать в настройках.' : 'Распознавание на NVIDIA GPU'}>{localSpeech.backend === 'cpu' ? 'CPU' : 'GPU'}</span>}
         <div className="timer-controls">
           {selectedId === liveCallId && phase !== 'idle' && <><IconButton title={phase === 'paused' ? 'Продолжить' : 'Пауза'} action={() => { if (phase === 'paused') void resumeCall(); else pauseCall() }} icon={phase === 'paused' ? <Play size={18} /> : <Pause size={18} />} disabled={callStarting} /><IconButton title="Остановить звонок" action={stopCall} icon={<Square size={18} />} /></>}
           {selected.kind === 'practice' ? <><IconButton title={practiceTimerRunningId === selected.id ? 'Пауза таймера тренировки' : 'Запустить таймер тренировки'} action={() => togglePracticeTimer(selected.id)} icon={practiceTimerRunningId === selected.id ? <Pause size={18} /> : <Play size={18} />} /><time data-testid="practice-timer">{duration(selected.duration || 0)}</time></> : <time data-testid="timer">{duration(selected?.duration || 0)}</time>}
@@ -1384,7 +1391,7 @@ function App() {
         <aside className="ai-pane" aria-label={selected.kind === 'practice' ? 'Разбор ответа' : 'AI Подсказки'}><div className="pane-heading"><h2><Sparkles size={17} />{selected.kind === 'practice' ? 'Разбор ответа' : 'AI Подсказки'}</h2>{iconButton('Скопировать ответ', () => void navigator.clipboard.writeText(lastAnswer?.text || '').catch(e => setError(errorText(e))), <Copy size={17} />, !lastAnswer)}</div>
           {selected.kind !== 'practice' && questionPreview && <div className={`heard-question ${questionPreview.state}`} data-testid="heard-question" aria-live="polite">
             <div><small>{questionPreview.state === 'partial' ? 'Черновик распознавания' : questionPreview.state === 'recognized' ? 'Распознанный вопрос' : questionPreview.state === 'correction' ? 'Последнее уточнение' : questionPreview.state === 'review' ? 'Проверьте распознавание' : 'Собеседник'}</small><p>{questionPreview.text || (pendingTranscriptions ? 'Распознаю…' : 'Жду реплику собеседника')}</p></div>
-            {questionPreview.text && iconButton('Исправить распознанную реплику', editInterviewerPreview, <Pencil size={15} />)}
+            {questionPreview.text && <IconButton title="Исправить распознанную реплику" action={() => void editInterviewerPreview()} icon={<Pencil size={15} />} />}
           </div>}
           <div className="ai-tools"><button className="primary" title={liveAnswerDraft ? 'Ответить по черновику распознавания' : undefined} disabled={busy || !selected || (selected.kind === 'practice' && !practiceNeedsReview)} onClick={() => void ask(selected.kind === 'practice' ? 'review' : 'answer')}><Sparkles size={16} />{selected.kind === 'practice' ? 'Разобрать ответ' : 'Что сказать?'}</button>{selected.kind === 'practice' && <><button disabled={busy || !practiceCanContinue || practiceNeedsReview || practiceMicState !== 'idle'} onClick={() => void ask('practice-next')}>{hasPracticeScenario ? 'Уточнение' : 'Следующий вопрос'}</button>{hasPracticeScenario && <button disabled={busy || !practiceCanContinue || practiceNeedsReview || practiceMicState !== 'idle' || selectedPracticeStep >= selectedPracticeQuestionCount - 1} onClick={advancePracticeTrack}>Дальше по сценарию</button>}{hasPracticeScenario && <button disabled={!practiceCanReport} onClick={() => void ask('practice-report')}>{selected.practiceReportComplete ? 'Итоги готовы' : practiceReportAttempted ? 'Отчёт уже запрошен' : 'Итоговый разбор'}</button>}</>}{selected.kind !== 'practice' && <button disabled={busy} onClick={() => void ask('screen')}><Scan size={17} />Выделить задачу</button>}</div>
           {busy && <div className="thinking" role="status">{waitingForSpeech ? 'Распознаю вопрос…' : requestMode === 'practice-next' ? 'Готовлю уточнение…' : requestMode === 'practice-report' ? 'Собираю итог тренировки…' : 'Готовлю ответ…'}<IconButton title="Отменить подсказку" action={cancelAnswer} icon={<X size={16} />} /></div>}
@@ -1404,6 +1411,7 @@ function App() {
     {modal && <div className="modal-backdrop"><section className="modal" role="dialog" aria-modal="true" aria-label="Настройки">
       <header><h2>Настройки</h2>{iconButton('Закрыть настройки', () => closeSettings(), <X size={18} />, saving)}</header>
         <UpdatePanel version={version} busy={updateBusy} beforeInstall={saveBeforeUpdate} />
+        {!practiceOnlyBuild && <section className="privacy-settings" aria-label="Скрытый режим и запись"><h3>Скрытый режим</h3><p>Защита окна может блокировать запись OBS/NVIDIA. Для записи выключи скрытый режим кнопкой с глазом. Прозрачность оверлея работает отдельно.</p><button onClick={() => void togglePrivacy()} disabled={privacyBusy || (!protectedCapture && busy)}>{protectedCapture ? 'Выключить скрытый режим' : 'Включить скрытый режим'}</button></section>}
         <label>Ключ OpenRouter <small>{settings.hasKey ? 'Сохранён на этом компьютере' : 'Не сохранён'}</small><input type="password" autoComplete="off" value={configDraft.apiKey} placeholder={settings.hasKey ? 'Новый ключ (необязательно)' : 'Ключ OpenRouter'} onChange={e => { setModelTestArmed(false); setConfigDraft({ ...configDraft, apiKey: e.target.value }) }} /></label>
         <label>Модель<input list="model-catalog" value={configDraft.model} onChange={e => { setModelTestArmed(false); setConfigDraft({ ...configDraft, model: e.target.value }) }} /></label>
         <datalist id="model-catalog">{models.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}</datalist>
