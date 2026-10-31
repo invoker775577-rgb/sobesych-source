@@ -342,7 +342,7 @@ function App() {
     const existing = dataRef.current.calls.find(item => item.id === callId)?.usage?.find(item => item.id === requestId)
     if (existing?.status === 'pending') trackUsage(callId, { ...existing, status, costUsd: undefined })
   }
-  function recordCloudTranscription(callId: string, audio: string, localOnly = false, signal?: AbortSignal, provisional = false) {
+  function recordCloudTranscription(callId: string, audio: string, localOnly = false, signal?: AbortSignal, provisional = false, source?: 'me' | 'interviewer') {
     const config = settingsRef.current
     const counted = !localOnly && config.transcriptionMode === 'openrouter'
     const id = crypto.randomUUID()
@@ -351,7 +351,7 @@ function App() {
     if (counted) trackUsage(callId, createUsageRecord({ id, operation: 'transcription', provider, model: config.transcriptionModel, status: 'pending' }))
     const cancel = () => { void window.sobesych?.cancelRequests(id).catch(() => {}) }
     signal?.addEventListener('abort', cancel, { once: true })
-    return window.sobesych!.transcribe({ audio, localOnly, provisional, requestId: id }).then(result => {
+    return window.sobesych!.transcribe({ audio, localOnly, provisional, source, requestId: id }).then(result => {
       if (result.error) throw new Error(result.error)
       if (counted) trackUsage(callId, createUsageRecord({ id, operation: 'transcription', provider, model: result.model || config.transcriptionModel, usage: result.usage }))
       return result
@@ -513,7 +513,7 @@ function App() {
       microphoneEnabled: micEnabledRef.current,
       localOnly: settingsRef.current.transcriptionMode === 'local',
       previewEnabled: settingsRef.current.transcriptionMode === 'local' && localPreviewEnabled.current,
-      transcribe: (audio, localOnly, signal, provisional) => recordCloudTranscription(id, audio, localOnly, signal, provisional),
+      transcribe: (audio, localOnly, signal, provisional, source) => recordCloudTranscription(id, audio, localOnly, signal, provisional, source),
       onStatus: (source, status) => {
         if (generation !== epoch.current) return
         if (source === 'interviewer') {

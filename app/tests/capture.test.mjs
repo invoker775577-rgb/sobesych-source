@@ -67,8 +67,8 @@ function setup(t, transcribe, options = {}) {
 
 test('practice capture records only the microphone and forces local transcription', async t => {
   const requests = []
-  const { session, nodes, texts, streams, mediaRequests, getSystemSourceRequests, getDisplayRequests } = setup(t, async (audio, localOnly) => {
-    requests.push({ audio, localOnly })
+  const { session, nodes, texts, streams, mediaRequests, getSystemSourceRequests, getDisplayRequests } = setup(t, async (audio, localOnly, _signal, provisional, source) => {
+    requests.push({ audio, localOnly, provisional, source })
     return { text: 'I checked the logs and found the cause.' }
   }, { localOnly: true })
   await session.startMicrophoneOnly()
@@ -81,6 +81,8 @@ test('practice capture records only the microphone and forces local transcriptio
   assert.deepEqual(await session.stopMicrophoneOnly(), [])
   assert.equal(requests.length, 1)
   assert.equal(requests[0].localOnly, true)
+  assert.equal(requests[0].source, 'me')
+  assert.equal(requests[0].provisional, false)
   assert.match(requests[0].audio, /^data:audio\/wav;base64,/)
   assert.deepEqual(texts.map(item => item.slice(0, 2)), [['me', 'I checked the logs and found the cause.']])
   assert.ok(streams.flatMap(stream => stream.getTracks()).every(track => track.readyState === 'ended'))

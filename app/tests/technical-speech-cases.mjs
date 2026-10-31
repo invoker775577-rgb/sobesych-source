@@ -1,4 +1,5 @@
 export const technicalSpeechCases = [
+  { language: 'ru', text: 'Когда ты планируешь заработать пять тысяч евро?', expected: [/когда/iu, /планируешь\s+заработать/iu, /5000|5\s*000|пять\s+тысяч/iu, /евро/iu] },
   { language: 'ru', text: 'Что такое SQL JOIN и как отличаются INNER JOIN и LEFT JOIN?', expected: [/SQL\s+JOIN/i, /INNER\s+JOIN/i, /LEFT\s+JOIN/i] },
   { language: 'ru', text: 'Можно ли Kafka отнести к транзакционным системам?', expected: [/kafka/i, /транзакц/i] },
   { language: 'ru', text: 'В Kafka консюмер читает сообщения сразу или ждёт, пока проходит коммит?', expected: [/kafka/i, /консюмер|consumer/i, /коммит|commit/i] },

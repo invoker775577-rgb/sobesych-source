@@ -1,5 +1,5 @@
 {
-  "applicationVersion": "0.5.81",
+  "applicationVersion": "0.5.82",
   "includesUnreleasedFixes": false,
   "hashNormalization": "UTF-8 text CRLF to LF; binary files unchanged",
   "exportPolicy": "Application source and synthetic tests only; no private Git history, profiles, recordings or evidence",
@@ -42,11 +42,11 @@
     },
     {
       "path": "app/electron/local-stt.cjs",
-      "sha256": "04b2cb6cce750b091610548114990fe6ed80059dc998f4e94441e4a2e4ed5f13"
+      "sha256": "028d9855e3566dc8876fdc3c68a6966be1a135caa073fbdd462a228acfdb2cd5"
     },
     {
       "path": "app/electron/main.cjs",
-      "sha256": "51745d37065f6f24e0d30eff5ffc3c9359c4dabbbb5f5b1520d466d31ceb3c8f"
+      "sha256": "f5a468aa6e58ff98ae67ab87c85d450f06b87232cb56bbd323a77bc026046ae2"
     },
     {
       "path": "app/electron/preload.cjs",
@@ -98,11 +98,11 @@
     },
     {
       "path": "app/package-lock.json",
-      "sha256": "6cd9cc001e8666f95838314234e9ef38fff3398676e9a03027a6c2f17efa68c3"
+      "sha256": "cc01e0f42dfe46b9ae6f6b8d8e91098ee4b6b108fb758a9d31296305932c3607"
     },
     {
       "path": "app/package.json",
-      "sha256": "b28180cdbb0e98cb7f90bbf23c2c2780442eb7685d25a9f2533f300b63ba3e0c"
+      "sha256": "75e0addd60ade405f25f80a568adbe908b3e6307dc2c3c7d849ba3062f7d7a9f"
     },
     {
       "path": "app/public/favicon.svg",
@@ -134,7 +134,7 @@
     },
     {
       "path": "app/server.mjs",
-      "sha256": "0187425f15dab1434899197f41e034e410b751e60f5ff9f4e84403f87344532b"
+      "sha256": "dea534ddcb66e5c41c9137cf5c0b802c4b455d9b8a7d874583a4c5603aba170f"
     },
     {
       "path": "app/src/App.css",
@@ -142,7 +142,7 @@
     },
     {
       "path": "app/src/App.tsx",
-      "sha256": "5d55e58dbbd36cce4ac9f63c67e1df01231f8926b29968a611557a28b5b9557c"
+      "sha256": "b2bd3c48e7920c713dec2a718aaaff130542d912849a46a6de987f712bc4a0b9"
     },
     {
       "path": "app/src/assets/hero.png",
@@ -166,7 +166,7 @@
     },
     {
       "path": "app/src/capture.ts",
-      "sha256": "f98af2a4fa3a4a45f78faf4c11a912a7729395c29138e8931707a544cdec1247"
+      "sha256": "cfae411601ceb48c9e292d1506b7d974a4229128db4ddc057765419c9c7b3aed"
     },
     {
       "path": "app/src/domain-knowledge.mjs",
@@ -242,7 +242,7 @@
     },
     {
       "path": "app/src/types.ts",
-      "sha256": "6e804071d780024c855e1b908aebea2cf975d6eef27c73cd047a23b969ef033a"
+      "sha256": "4dcae516b6258822adf203c76467aea3cd7e22dd22cff5cd12224339e061a115"
     },
     {
       "path": "app/src/UpdatePanel.tsx",
@@ -270,7 +270,7 @@
     },
     {
       "path": "app/tests/capture.test.mjs",
-      "sha256": "fc65d466ca4b252bcf74f3e53a62590fb9f4df03c4a95bc9a344ec76865728ea"
+      "sha256": "d9d09ce9dfb22f20fdefab58f2f96e592c029bcd434988d92f16aeaaf42cd499"
     },
     {
       "path": "app/tests/clean-releases.test.mjs",
@@ -282,7 +282,7 @@
     },
     {
       "path": "app/tests/local-stt.test.mjs",
-      "sha256": "65bf4bf3521a36a03da54752acfef4ddbc75c4f6972338c4068b1397aa47e1d1"
+      "sha256": "0c2e19a46a63b94f8f5370d8c333af0b3cae21ad5f89da7f37480de6453f2852"
     },
     {
       "path": "app/tests/make-tts.ps1",
@@ -314,11 +314,11 @@
     },
     {
       "path": "app/tests/rollback.test.mjs",
-      "sha256": "0b581d6eca36949f4fdd5e07d57b887fe06f28a2913c4793908ec9af1867e419"
+      "sha256": "53f3452ea18718da7c796133fbd2c1446bec2d20f18c526260ee2fd0a8f5277d"
     },
     {
       "path": "app/tests/technical-speech-cases.mjs",
-      "sha256": "5757b3a70fbe3e5a8012a424f35ff478bacb3f04bfb71df57230c9717973b997"
+      "sha256": "38085cee24098a0a5ddcd6e8990f770a4ae64563406fce1bf393e1c3bbdc40ed"
     },
     {
       "path": "app/tests/updates.test.mjs",
@@ -354,7 +354,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "4dc6581b6c3e769948f09986671dd3f4979cbd651b1d8bf9c52cd54634c732fb"
+      "sha256": "93cdd0c58951cb41e145371f118914728f6b29922934bec7805c5c5946295248"
     },
     {
       "path": "SECURITY.md",

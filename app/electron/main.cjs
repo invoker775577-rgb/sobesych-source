@@ -8,7 +8,7 @@ const { spawn } = require('node:child_process')
 const { createStore } = require('./store.cjs')
 const { formatAnswerTrace } = require('./answer-trace.cjs')
 const { createUpdates, createWindowsUpdater } = require('./updates.cjs')
-const { createLocalStt, shouldUseLocalTranscription } = require('./local-stt.cjs')
+const { createLocalStt, shouldUseLocalTranscription, formatTranscriptionTrace } = require('./local-stt.cjs')
 const { isValidRegion, mapRegionToImage } = require('./screen-region.cjs')
 const { prepareScreenLanguage } = require('./screen-language.cjs')
 const packageMetadata = require('../package.json')
@@ -245,6 +245,7 @@ else {
           ? await localStt.transcribe(payload, localLanguage, controller.signal)
           : await service[operation](payload, controller.signal, onDelta)
         log(`provider:${operation}`, `ok ms=${Math.round(performance.now() - started)} model=${result.model || ''} characters=${(result.text || result.answer || '').length}`)
+        if (operation === 'transcribe' && result.diagnostics) log('speech', formatTranscriptionTrace(payload, result.diagnostics))
         return result
       }
       finally { requests.delete(id) }

@@ -30,7 +30,7 @@ declare global {
       savePracticeLibraries(value: PracticeLibrary[]): Promise<Result>
       assist(value: { requestId: string; mode: string; messages: Message[]; profileContext: string; focus: string; screenshot?: string; screenLanguage?: 'ru' | 'en'; partialQuestion?: boolean; maxTokens?: number; singleAttempt?: boolean }): Promise<Result & { answer?: string } & UsageResult>
       onAnswerDelta(callback: (event: { requestId: string; text: string }) => void): () => void
-      transcribe(value: { audio: string; localOnly?: boolean; provisional?: boolean; requestId?: string; language?: 'auto' | 'ru' | 'en' }): Promise<Result & { text?: string } & UsageResult & { text?: string }>
+      transcribe(value: { audio: string; localOnly?: boolean; provisional?: boolean; source?: 'me' | 'interviewer'; requestId?: string; language?: 'auto' | 'ru' | 'en' }): Promise<Result & { text?: string } & UsageResult & { text?: string }>
       warmLocalTranscription(): Promise<Result & { previewEnabled?: boolean; backend?: 'cpu' | 'cuda' }>
       releaseLocalTranscription?(): Promise<Result>
       installGpuSpeech(): Promise<Result>

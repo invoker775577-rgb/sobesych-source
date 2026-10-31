@@ -10,6 +10,45 @@ function shouldUseLocalTranscription(forceLocal, transcriptionMode) {
   return forceLocal === true || transcriptionMode === 'local'
 }
 
+function audioDiagnostics(wav) {
+  let format
+  for (let offset = 12; offset + 8 <= wav.length;) {
+    const name = wav.toString('ascii', offset, offset + 4)
+    const size = wav.readUInt32LE(offset + 4)
+    const start = offset + 8
+    if (start + size > wav.length) return {}
+    if (name === 'fmt ' && size >= 16) format = {
+      pcm: wav.readUInt16LE(start), channels: wav.readUInt16LE(start + 2),
+      rate: wav.readUInt32LE(start + 4), bits: wav.readUInt16LE(start + 14),
+    }
+    if (name === 'data' && format?.pcm === 1 && format.bits === 16 && format.rate > 0 && format.channels > 0 && size >= 2) {
+      let squares = 0; let peak = 0; let clipped = 0
+      const count = Math.floor(size / 2)
+      for (let index = 0; index < count; index++) {
+        const value = Math.abs(wav.readInt16LE(start + index * 2)) / 32768
+        squares += value * value
+        peak = Math.max(peak, value)
+        if (value >= 0.999) clipped++
+      }
+      const db = value => Math.round(Math.max(-120, 20 * Math.log10(value)) * 10) / 10
+      return { durationMs: Math.round(count * 1000 / format.channels / format.rate), rmsDb: db(Math.sqrt(squares / count)), peakDb: db(peak), clippedFraction: clipped / count }
+    }
+    offset = start + size + size % 2
+  }
+  return {}
+}
+
+function formatTranscriptionTrace(input = {}, diagnostics = {}) {
+  const trace = { source: ['me', 'interviewer'].includes(input.source) ? input.source : 'unknown', kind: input.provisional === true ? 'preview' : 'final' }
+  if (/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(input.requestId || '')) trace.requestId = input.requestId
+  if (['cpu', 'cuda'].includes(diagnostics.backend)) trace.backend = diagnostics.backend
+  if (/^[a-z]{2,16}$/.test(diagnostics.language || '')) trace.language = diagnostics.language
+  for (const [key, min, max] of [['durationMs', 0, 600_000], ['rmsDb', -120, 0], ['peakDb', -120, 0], ['clippedFraction', 0, 1], ['avgLogprob', -100, 0], ['noSpeechProb', 0, 1]]) {
+    if (Number.isFinite(diagnostics[key])) trace[key] = Math.round(Math.min(max, Math.max(min, diagnostics[key])) * 1000) / 1000
+  }
+  return JSON.stringify(trace)
+}
+
 function warmupAudio() {
   const sampleCount = 8000
   const wav = Buffer.alloc(44 + sampleCount * 2)
@@ -133,7 +172,9 @@ function createLocalStt(directory, bundledRoot, options = {}) {
         const form = new FormData()
         form.set('file', new Blob([wav], { type: 'audio/wav' }), 'speech.wav')
         form.set('language', language === 'auto' ? 'auto' : language.split('-')[0])
-        form.set('response_format', 'json')
+        form.set('response_format', 'verbose_json')
+        // Return existing decoder scores without a second language-probability pass.
+        form.set('no_language_probabilities', 'true')
         form.set('temperature', '0')
         // A vocabulary prompt can overwhelm the first half-second of a live preview.
         if (input.provisional !== true) form.set('prompt', vocabularyHint)
@@ -142,7 +183,14 @@ function createLocalStt(directory, bundledRoot, options = {}) {
         const data = await response.json()
         if (current !== generation) throw new Error('Локальное распознавание остановлено')
         signal?.throwIfAborted()
-        return { text: String(data.text || '').replace(/\s+/g, ' ').trim(), usage: { cost: 0 } }
+        const segments = Array.isArray(data.segments) ? data.segments : []
+        const scores = segments.map(segment => segment.avg_logprob).filter(Number.isFinite)
+        const silence = segments.map(segment => segment.no_speech_prob).filter(Number.isFinite)
+        return { text: String(data.text || '').replace(/\s+/g, ' ').trim(), usage: { cost: 0 }, diagnostics: {
+          ...audioDiagnostics(wav), backend: runtime?.backend, language: data.language,
+          ...(scores.length ? { avgLogprob: scores.reduce((sum, value) => sum + value, 0) / scores.length } : {}),
+          ...(silence.length ? { noSpeechProb: Math.max(...silence) } : {}),
+        } }
       } catch (error) {
         if (deadline.signal.aborted) {
           if (controller === worker && current === generation) release()
@@ -186,4 +234,4 @@ function createLocalStt(directory, bundledRoot, options = {}) {
   }) }
 }
 
-module.exports = { createLocalStt, shouldUseLocalTranscription }
+module.exports = { createLocalStt, shouldUseLocalTranscription, audioDiagnostics, formatTranscriptionTrace }

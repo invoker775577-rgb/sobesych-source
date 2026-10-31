@@ -20,7 +20,7 @@ type Options = {
   onPending: (count: number) => void
   localOnly?: boolean
   createVoiceDetector?: (sampleRate: number) => Promise<VoiceDetector>
-  transcribe: (audio: string, localOnly?: boolean, signal?: AbortSignal, provisional?: boolean) => Promise<{ text?: string; error?: string; model?: string; usage?: ProviderUsage }>
+  transcribe: (audio: string, localOnly?: boolean, signal?: AbortSignal, provisional?: boolean, source?: Source) => Promise<{ text?: string; error?: string; model?: string; usage?: ProviderUsage }>
 }
 type Segment = { source: Source; kind: 'preview' | 'final'; sourceStopped: AbortSignal; utteranceId: number | null; audio: string; createdAt: string; speechStartedAt: number; speechEndedAt: number; queuedAt: number; finish: (error?: string) => void }
 type Job = { source: Source; kind: Segment['kind'] }
@@ -390,7 +390,7 @@ export class CaptureSession {
     this.activeTranscriptions.set(item.source, active)
     try {
       const transcriptionStartedAt = performance.now()
-      const result = await abortable(this.options.transcribe(item.audio, this.options.localOnly === true, signal, item.kind === 'preview'), signal)
+      const result = await abortable(this.options.transcribe(item.audio, this.options.localOnly === true, signal, item.kind === 'preview', item.source), signal)
       if (this.closed || signal.aborted) {
         retry = active.preempted && !this.closed && !item.sourceStopped.aborted
         return retry

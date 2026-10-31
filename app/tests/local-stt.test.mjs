@@ -10,6 +10,7 @@ import { encodeWav } from '../src/audio.mjs'
 
 const require = createRequire(import.meta.url)
 const modulePath = require.resolve('../electron/local-stt.cjs')
+const { audioDiagnostics, formatTranscriptionTrace } = require(modulePath)
 const audio = `data:audio/wav;base64,${Buffer.from(encodeWav(new Float32Array(8000), 16000)).toString('base64')}`
 function setup(t, launch, fetchImpl, options = {}) {
   const root = mkdtempSync(join(tmpdir(), 'sobesych-stt-unit-'))
@@ -104,6 +105,47 @@ test('final transcripts receive only technical vocabulary while previews remain 
   assert.equal(prompts[0], null)
   assert.match(prompts[1], /Kubernetes.*Docker.*Terraform.*Kafka.*gRPC/)
   assert.doesNotMatch(prompts[1], /\d|Transactions|ShopID|Shop ID/i, 'Do not bias task-specific identifiers or values')
+})
+
+test('local scores and signal levels are diagnostic metadata, without changing decoding or suppressing text', async t => {
+  const stt = setup(t, () => {
+    const child = new EventEmitter()
+    child.kill = () => {}
+    return child
+  }, async (url, options) => {
+    if (new URL(url).pathname !== '/inference') return new Response('ready')
+    assert.equal(options.body.get('response_format'), 'verbose_json')
+    assert.equal(options.body.get('no_language_probabilities'), 'true')
+    for (const name of ['audio_ctx', 'no_timestamps', 'token_timestamps', 'beam_size', 'best_of']) assert.equal(options.body.get(name), null)
+    return Response.json({ text: '  A useful short question?  ', language: 'english', segments: [{ avg_logprob: -2, no_speech_prob: .9 }, { avg_logprob: -1, no_speech_prob: .8 }] })
+  })
+  const result = await stt.transcribe({ audio, source: 'interviewer' }, 'auto')
+  assert.equal(result.text, 'A useful short question?', 'Low decoder scores alone must not discard a question')
+  assert.deepEqual(result.usage, { cost: 0 })
+  assert.deepEqual(result.diagnostics, { durationMs: 500, rmsDb: -120, peakDb: -120, clippedFraction: 0, backend: 'cuda', language: 'english', avgLogprob: -1.5, noSpeechProb: .9 })
+})
+
+test('signal diagnostics handle WAV chunks and invalid data without reading past the audio', () => {
+  const wav = Buffer.from(encodeWav(new Float32Array(16000).fill(.5), 16000))
+  assert.deepEqual(audioDiagnostics(wav), { durationMs: 1000, rmsDb: -6, peakDb: -6, clippedFraction: 0 })
+  const extra = Buffer.alloc(10); extra.write('JUNK'); extra.writeUInt32LE(1, 4)
+  const withChunk = Buffer.concat([wav.subarray(0, 12), extra, wav.subarray(12)])
+  assert.deepEqual(audioDiagnostics(withChunk), audioDiagnostics(wav), 'Unknown odd-sized chunks include their padding byte')
+  assert.deepEqual(audioDiagnostics(wav.subarray(0, -1)), {})
+  assert.deepEqual(audioDiagnostics(Buffer.alloc(10)), {})
+  const clipped = audioDiagnostics(Buffer.from(encodeWav(new Float32Array(8000).fill(1), 16000)))
+  assert.equal(clipped.clippedFraction, 1)
+})
+
+test('speech diagnostics log only bounded metadata, never text, audio or arbitrary fields', () => {
+  const privateData = 'DO_NOT_LOG_TEST_PRIVATE_DATA'
+  const input = { source: 'interviewer', provisional: true, requestId: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee', audio: privateData, text: privateData, apiKey: privateData }
+  const diagnostics = { backend: 'cuda', language: 'english', durationMs: 9000, rmsDb: -24.5, peakDb: -5, clippedFraction: .001, avgLogprob: -.4, noSpeechProb: .01, text: privateData, segments: [privateData] }
+  const logged = formatTranscriptionTrace(input, diagnostics)
+  assert.doesNotMatch(logged, /DO_NOT_LOG|segments|apiKey|audio|text/)
+  assert.deepEqual(JSON.parse(logged), { source: 'interviewer', kind: 'preview', requestId: input.requestId, backend: 'cuda', language: 'english', durationMs: 9000, rmsDb: -24.5, peakDb: -5, clippedFraction: .001, avgLogprob: -.4, noSpeechProb: .01 })
+  const invalid = JSON.parse(formatTranscriptionTrace({ source: privateData, requestId: privateData }, { backend: privateData, language: privateData, rmsDb: NaN, durationMs: Infinity, peakDb: 50, noSpeechProb: -4 }))
+  assert.deepEqual(invalid, { source: 'unknown', kind: 'final', peakDb: 0, noSpeechProb: 0 })
 })
 
 test('local recognizer restart invalidates its previous warmup and recovers after a failed launch', async t => {
