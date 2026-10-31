@@ -190,6 +190,8 @@ function isExplicitExperienceQuestion(text = '') {
 
 export function isExperienceQuestion(text = '') {
   const question = normalizeTranscriptText(text)
+  if (/(?:в\s+работе|на\s+работе|at\s+work|in\s+your\s+(?:job|project)|in\s+production)/iu.test(question)
+    && /(?:как\s+(?:вы|ты).{0,35}(?:используете|используешь|применяете|применяешь)|how\s+do\s+you\s+(?:use|apply|work\s+with))(?=$|[^\p{L}])/iu.test(question)) return true
   const explicit = isExplicitExperienceQuestion(question) || isPersonalStoryQuestion(question)
   if (explicit) return true
   if (/(?:за\s+что\s+(?:вы\s+)?отвеча\p{L}*\s+лично|personally\s+responsible\s+for|how\s+did\s+your\s+(?:devops\s+)?team.{0,40}(?:split|divide).{0,20}ownership|on[ -]?call.{0,60}(?:experience|schedule|rotation|rota)|дежурств\p{L}*.{0,60}(?:опыт|график|смен))/iu.test(question)) return true
@@ -201,6 +203,9 @@ export function isExperienceQuestion(text = '') {
 }
 
 const personalStoryPatterns = [
+  /^(?:(?:ну|а|и|давай)[,\s]+)?кейсы?[,\s]+как\s+(?:ты|вы)(?=$|[^\p{L}\p{N}_])/iu,
+  /(?:расскаж\p{L}*|опиши\p{L}*).{0,48}кейс\p{L}*/iu,
+  /(?:tell\s+me\s+about|describe)\s+(?:a|an)\s+(?:work|production|technical)\s+case\b/iu,
   /(?:привед\p{L}*.{0,30}реальн\p{L}*\s+пример|give me a real example|tell me about a real example)/iu,
   /(?:расскаж\p{L}*|опиши\p{L}*).{0,56}(?:случа\p{L}*|истори\p{L}*|инцидент\p{L}*|ситуац\p{L}*|проект\p{L}*|релиз\p{L}*|сложн\p{L}*|проблем\p{L}*|задач\p{L}*)/iu,
   /расскаж\p{L}*.{0,24}как\s+(?:вы|ты)\s+(?:дела\p{L}*|строи\p{L}*|настраива\p{L}*|внедря\p{L}*|разбира\p{L}*|реша\p{L}*|откатыва\p{L}*)/iu,

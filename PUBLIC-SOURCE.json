@@ -1,5 +1,5 @@
 {
-  "applicationVersion": "0.5.82",
+  "applicationVersion": "0.5.83",
   "includesUnreleasedFixes": false,
   "hashNormalization": "UTF-8 text CRLF to LF; binary files unchanged",
   "exportPolicy": "Application source and synthetic tests only; no private Git history, profiles, recordings or evidence",
@@ -42,7 +42,7 @@
     },
     {
       "path": "app/electron/local-stt.cjs",
-      "sha256": "028d9855e3566dc8876fdc3c68a6966be1a135caa073fbdd462a228acfdb2cd5"
+      "sha256": "5f3e98249ab2d13a1ee5d2b2a591c3724eb716732a1aad663725f1695fcf6a7b"
     },
     {
       "path": "app/electron/main.cjs",
@@ -98,11 +98,11 @@
     },
     {
       "path": "app/package-lock.json",
-      "sha256": "cc01e0f42dfe46b9ae6f6b8d8e91098ee4b6b108fb758a9d31296305932c3607"
+      "sha256": "8796d766585a69e32caba2a545365f1668d1be1c3168ab6b90c141d2b7cfffe3"
     },
     {
       "path": "app/package.json",
-      "sha256": "75e0addd60ade405f25f80a568adbe908b3e6307dc2c3c7d849ba3062f7d7a9f"
+      "sha256": "2fb4843f3263d42c22c14fcaf0340ea438fcc7aedc038edafbfe54abfe6ece42"
     },
     {
       "path": "app/public/favicon.svg",
@@ -134,7 +134,7 @@
     },
     {
       "path": "app/server.mjs",
-      "sha256": "dea534ddcb66e5c41c9137cf5c0b802c4b455d9b8a7d874583a4c5603aba170f"
+      "sha256": "c61eaea4dac26585b4fc5958b4f97555b3d4b25db4b921d111d1f4422bffd938"
     },
     {
       "path": "app/src/App.css",
@@ -170,7 +170,7 @@
     },
     {
       "path": "app/src/domain-knowledge.mjs",
-      "sha256": "d0a729b6d706f5fd85c2af2b75de93aed297738933b907e72f0d182b3a67274b"
+      "sha256": "c86a3111910db00cacf22b97b9a1be01fb45348d8fdb32996c648ca0cf75d0f4"
     },
     {
       "path": "app/src/index.css",
@@ -238,7 +238,7 @@
     },
     {
       "path": "app/src/transcript.mjs",
-      "sha256": "1f15dea62447fed54d200efde379eb4a0a9fdf2f73ed1d5a1bbabe75e1d5a6dc"
+      "sha256": "031ffec8cf7e0b515a663ded12695d639f7e91fabc24ba0813efb3ffb5791afd"
     },
     {
       "path": "app/src/types.ts",
@@ -282,7 +282,7 @@
     },
     {
       "path": "app/tests/local-stt.test.mjs",
-      "sha256": "0c2e19a46a63b94f8f5370d8c333af0b3cae21ad5f89da7f37480de6453f2852"
+      "sha256": "2a02056b34aed81571f6887def422343fa74765810bbf1861f0381b076855003"
     },
     {
       "path": "app/tests/make-tts.ps1",
@@ -314,7 +314,7 @@
     },
     {
       "path": "app/tests/rollback.test.mjs",
-      "sha256": "53f3452ea18718da7c796133fbd2c1446bec2d20f18c526260ee2fd0a8f5277d"
+      "sha256": "b580752a39b876a9085df25b1166c62b54a25f067ea40d36793c375efdf085e5"
     },
     {
       "path": "app/tests/technical-speech-cases.mjs",
@@ -354,7 +354,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "93cdd0c58951cb41e145371f118914728f6b29922934bec7805c5c5946295248"
+      "sha256": "719469a2608e926dbf5323f22c36b7c26ca7d2a9bcc5831e7dbec6036def125f"
     },
     {
       "path": "SECURITY.md",

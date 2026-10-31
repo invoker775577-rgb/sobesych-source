@@ -11,7 +11,9 @@ import { encodeWav } from '../src/audio.mjs'
 const require = createRequire(import.meta.url)
 const modulePath = require.resolve('../electron/local-stt.cjs')
 const { audioDiagnostics, formatTranscriptionTrace } = require(modulePath)
-const audio = `data:audio/wav;base64,${Buffer.from(encodeWav(new Float32Array(8000), 16000)).toString('base64')}`
+const wavData = samples => `data:audio/wav;base64,${Buffer.from(encodeWav(samples, 16000)).toString('base64')}`
+const voice = gain => Float32Array.from({ length: 8000 }, (_, index) => gain * Math.sin(2 * Math.PI * 180 * index / 16000))
+const audio = wavData(voice(.1))
 function setup(t, launch, fetchImpl, options = {}) {
   const root = mkdtempSync(join(tmpdir(), 'sobesych-stt-unit-'))
   assert.ok(resolve(root).startsWith(resolve(tmpdir()) + sep))
@@ -122,7 +124,33 @@ test('local scores and signal levels are diagnostic metadata, without changing d
   const result = await stt.transcribe({ audio, source: 'interviewer' }, 'auto')
   assert.equal(result.text, 'A useful short question?', 'Low decoder scores alone must not discard a question')
   assert.deepEqual(result.usage, { cost: 0 })
-  assert.deepEqual(result.diagnostics, { durationMs: 500, rmsDb: -120, peakDb: -120, clippedFraction: 0, backend: 'cuda', language: 'english', avgLogprob: -1.5, noSpeechProb: .9 })
+  assert.deepEqual(result.diagnostics, { durationMs: 500, rmsDb: -23, peakDb: -20, clippedFraction: 0, backend: 'cuda', language: 'english', avgLogprob: -1.5, noSpeechProb: .9 })
+})
+
+test('near-silent loopback fragments never start inference, while quiet speech and clear peaks pass', async t => {
+  let launches = 0; let inferences = 0
+  const stt = setup(t, () => {
+    launches++
+    const child = new EventEmitter(); child.kill = () => {}
+    return child
+  }, async (url) => {
+    if (new URL(url).pathname !== '/inference') return new Response('ready')
+    inferences++
+    return Response.json({ text: 'Useful question' })
+  })
+  for (const samples of [new Float32Array(8000), voice(.0002)]) {
+    const result = await stt.transcribe({ audio: wavData(samples) }, 'auto')
+    assert.equal(result.text, '')
+    assert.equal(result.diagnostics.suppressed, 'near-silence')
+    assert.deepEqual(result.usage, { cost: 0 })
+  }
+  assert.equal(launches, 0)
+  assert.equal(inferences, 0)
+  assert.equal((await stt.transcribe({ audio: wavData(voice(.0015)) }, 'auto')).text, 'Useful question')
+  const quietWithPeak = voice(.0002); quietWithPeak[500] = .01
+  assert.equal((await stt.transcribe({ audio: wavData(quietWithPeak) }, 'auto')).text, 'Useful question')
+  assert.equal(inferences, 2)
+  assert.equal(JSON.parse(formatTranscriptionTrace({}, { suppressed: 'near-silence' })).suppressed, 'near-silence')
 })
 
 test('signal diagnostics handle WAV chunks and invalid data without reading past the audio', () => {

@@ -42,6 +42,7 @@ function formatTranscriptionTrace(input = {}, diagnostics = {}) {
   const trace = { source: ['me', 'interviewer'].includes(input.source) ? input.source : 'unknown', kind: input.provisional === true ? 'preview' : 'final' }
   if (/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(input.requestId || '')) trace.requestId = input.requestId
   if (['cpu', 'cuda'].includes(diagnostics.backend)) trace.backend = diagnostics.backend
+  if (diagnostics.suppressed === 'near-silence') trace.suppressed = diagnostics.suppressed
   if (/^[a-z]{2,16}$/.test(diagnostics.language || '')) trace.language = diagnostics.language
   for (const [key, min, max] of [['durationMs', 0, 600_000], ['rmsDb', -120, 0], ['peakDb', -120, 0], ['clippedFraction', 0, 1], ['avgLogprob', -100, 0], ['noSpeechProb', 0, 1]]) {
     if (Number.isFinite(diagnostics[key])) trace[key] = Math.round(Math.min(max, Math.max(min, diagnostics[key])) * 1000) / 1000
@@ -154,13 +155,20 @@ function createLocalStt(directory, bundledRoot, options = {}) {
     throw new Error('Локальная модель речи запускается слишком долго')
   }
 
-  async function transcribe(input, language, signal) {
+  async function transcribe(input, language, signal, warming = false) {
     const current = generation
     signal?.throwIfAborted()
     const match = /^data:audio\/wav;base64,([A-Za-z0-9+/=]+)$/.exec(input.audio || '')
     if (!match || match[1].length > 20_000_000) throw new Error('Некорректный аудиофрагмент')
     const wav = Buffer.from(match[1], 'base64')
     if (wav.toString('ascii', 0, 4) !== 'RIFF' || wav.toString('ascii', 8, 12) !== 'WAVE') throw new Error('Ожидается WAV-аудио')
+    const signalInfo = audioDiagnostics(wav)
+    if (closed) throw new Error('Локальное распознавание остановлено')
+    // WebRTC VAD can label very low-level loopback noise as speech. Require both
+    // a near-silent average and peak; a quiet voice with clear peaks still passes.
+    if (!warming && signalInfo.rmsDb < -66 && signalInfo.peakDb < -48) {
+      return { text: '', usage: { cost: 0 }, diagnostics: { ...signalInfo, backend: runtime?.backend, suppressed: 'near-silence' } }
+    }
     for (let attempt = 0; attempt < 2; attempt++) {
       await start()
       if (current !== generation) throw new Error('Локальное распознавание остановлено')
@@ -187,7 +195,7 @@ function createLocalStt(directory, bundledRoot, options = {}) {
         const scores = segments.map(segment => segment.avg_logprob).filter(Number.isFinite)
         const silence = segments.map(segment => segment.no_speech_prob).filter(Number.isFinite)
         return { text: String(data.text || '').replace(/\s+/g, ' ').trim(), usage: { cost: 0 }, diagnostics: {
-          ...audioDiagnostics(wav), backend: runtime?.backend, language: data.language,
+          ...signalInfo, backend: runtime?.backend, language: data.language,
           ...(scores.length ? { avgLogprob: scores.reduce((sum, value) => sum + value, 0) / scores.length } : {}),
           ...(silence.length ? { noSpeechProb: Math.max(...silence) } : {}),
         } }
@@ -212,7 +220,7 @@ function createLocalStt(directory, bundledRoot, options = {}) {
       const pending = (async () => {
         await start()
         if (closed || generation !== current) throw new Error('Локальное распознавание остановлено')
-        if (runtime.backend === 'cuda') await transcribe({ audio: warmupAudio(), provisional: true }, 'auto')
+        if (runtime.backend === 'cuda') await transcribe({ audio: warmupAudio(), provisional: true }, 'auto', undefined, true)
         if (closed || generation !== current) throw new Error('Локальное распознавание остановлено')
         return { ok: true, previewEnabled: runtime.backend === 'cuda', backend: runtime.backend }
       })().catch(error => { if (warmupPromise === pending) warmupPromise = null; throw error })

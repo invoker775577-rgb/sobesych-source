@@ -1,5 +1,16 @@
 const TOPICS = [
   {
+    id: 'async-execution',
+    match: /асинхрон\p{L}*|\b(?:async|asynchronous|asynchrony)\b/iu,
+    // https://docs.python.org/3/library/asyncio-task.html
+    guidance: [
+      'Асинхронность позволяет выполнять другую готовую работу, пока операция ввода-вывода ждёт результат. Это не обязательно параллельное выполнение на нескольких ядрах и не автоматическое ускорение вычислений. В цикле событий блокирующий вызов задержит остальные задачи, даже внутри async-функции. Для полезного ожидания нужны подходящие неблокирующие API. Для сравнения объясни, что может происходить во время ожидания, и назови ограничение. Не утверждай, что async всегда быстрее или сам создаёт потоки.',
+    ],
+    english: [
+      'Async lets other ready work run while an I/O operation waits. It does not necessarily run work in parallel on several CPU cores or make calculations faster. A blocking call can still block an event loop inside an async function. Useful waiting needs suitable non-blocking APIs. Explain what can happen while waiting and one limit. Do not say async always runs faster or automatically creates threads.',
+    ],
+  },
+  {
     id: 'zabbix-basics',
     match: /(?:\bZabbix\b|забб?икс)/iu,
     guidance: [
