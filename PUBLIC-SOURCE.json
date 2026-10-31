@@ -1,5 +1,5 @@
 {
-  "applicationVersion": "0.5.83",
+  "applicationVersion": "0.5.84",
   "includesUnreleasedFixes": false,
   "hashNormalization": "UTF-8 text CRLF to LF; binary files unchanged",
   "exportPolicy": "Application source and synthetic tests only; no private Git history, profiles, recordings or evidence",
@@ -46,7 +46,7 @@
     },
     {
       "path": "app/electron/main.cjs",
-      "sha256": "f5a468aa6e58ff98ae67ab87c85d450f06b87232cb56bbd323a77bc026046ae2"
+      "sha256": "78f6f6b062b9f3b5289af3b4e7977400fecb7b25925ba5d4d15e99c86fe7de33"
     },
     {
       "path": "app/electron/preload.cjs",
@@ -78,7 +78,7 @@
     },
     {
       "path": "app/electron/store.cjs",
-      "sha256": "6783dfe798e2e0e2cf3b0d42d18da94432869075f14ce3ac3e14d4237a8d13ce"
+      "sha256": "3a7d87a1218d96c6885da4a497cbdb7980a40b7196961d37556bdee77ec65d5a"
     },
     {
       "path": "app/electron/third-party-notices.txt",
@@ -98,11 +98,11 @@
     },
     {
       "path": "app/package-lock.json",
-      "sha256": "8796d766585a69e32caba2a545365f1668d1be1c3168ab6b90c141d2b7cfffe3"
+      "sha256": "b64bfcb536b9e67cbd7ae7709d42d9ed73084f3c5aa2f8634601c79f3a3416ad"
     },
     {
       "path": "app/package.json",
-      "sha256": "2fb4843f3263d42c22c14fcaf0340ea438fcc7aedc038edafbfe54abfe6ece42"
+      "sha256": "119320061f9204a365a582745a6d5f326382f6f3be74083ac5a781910aa90ccc"
     },
     {
       "path": "app/public/favicon.svg",
@@ -134,15 +134,15 @@
     },
     {
       "path": "app/server.mjs",
-      "sha256": "c61eaea4dac26585b4fc5958b4f97555b3d4b25db4b921d111d1f4422bffd938"
+      "sha256": "9b0891e12620d5cf2099a1ed0f0c8eba0fd23c583f4dacbdd6e271b00063b3f0"
     },
     {
       "path": "app/src/App.css",
-      "sha256": "ed79f260b5cf23c50f1b0f7b0c15479006b9307aae24bb53cd58794cac4d0637"
+      "sha256": "267713523baffc9c26ba191dfdcfe0c588f1fe20824783427fae111e55dabae9"
     },
     {
       "path": "app/src/App.tsx",
-      "sha256": "b2bd3c48e7920c713dec2a718aaaff130542d912849a46a6de987f712bc4a0b9"
+      "sha256": "fdd67fbcb8c9e408d1cec7d0a9b8b183cbf454da1f2608d06ded15b26c8cd3e8"
     },
     {
       "path": "app/src/assets/hero.png",
@@ -170,7 +170,7 @@
     },
     {
       "path": "app/src/domain-knowledge.mjs",
-      "sha256": "c86a3111910db00cacf22b97b9a1be01fb45348d8fdb32996c648ca0cf75d0f4"
+      "sha256": "6c2cd37c56a934ee9ba840f0313c4807e26fdcadcd1a5a7779f3ba850b6b1490"
     },
     {
       "path": "app/src/index.css",
@@ -238,11 +238,11 @@
     },
     {
       "path": "app/src/transcript.mjs",
-      "sha256": "031ffec8cf7e0b515a663ded12695d639f7e91fabc24ba0813efb3ffb5791afd"
+      "sha256": "c9a9ca9ba716067ff3d53c0cd642bc2558729214d4f265bc845fca9fa63aaa4a"
     },
     {
       "path": "app/src/types.ts",
-      "sha256": "4dcae516b6258822adf203c76467aea3cd7e22dd22cff5cd12224339e061a115"
+      "sha256": "04e289ff318343f3adac8e7197e9a1637dc0ebf1ddda212c615ccfea08f23e0c"
     },
     {
       "path": "app/src/UpdatePanel.tsx",
@@ -275,6 +275,10 @@
     {
       "path": "app/tests/clean-releases.test.mjs",
       "sha256": "32b0137a10568cfe3c6f48d59a05468b498e503be82e48c5c0372d493a795889"
+    },
+    {
+      "path": "app/tests/generic-answers.test.mjs",
+      "sha256": "04c3f71f3e51570d7ac45805faae64152cd9ad6dd0f14088d4a60a3ade5e2403"
     },
     {
       "path": "app/tests/local-stt-regression.mjs",
@@ -314,7 +318,7 @@
     },
     {
       "path": "app/tests/rollback.test.mjs",
-      "sha256": "b580752a39b876a9085df25b1166c62b54a25f067ea40d36793c375efdf085e5"
+      "sha256": "53810b335f9c1a19cee32c1377a6d457ec442f1fe129e5aebdcc2d37dc78ec8d"
     },
     {
       "path": "app/tests/technical-speech-cases.mjs",
@@ -354,7 +358,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "719469a2608e926dbf5323f22c36b7c26ca7d2a9bcc5831e7dbec6036def125f"
+      "sha256": "e6978dde2e2e45d9b73e8e718edcf6bb1f05fb1c73e577a661a9db50e425ea3d"
     },
     {
       "path": "SECURITY.md",

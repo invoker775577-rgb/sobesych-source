@@ -343,7 +343,7 @@ const TOPICS = [
     english: [
       'Argo CD is a GitOps controller for Kubernetes, not a CI build pipeline. An Application connects a Git source (repository, path, and revision) to a target cluster and namespace.',
       'The controller compares the desired state in Git with the live cluster state. It reports OutOfSync and can sync changes by hand or by sync policy. CI can build and test an image, then update its tag in Git.',
-      'Do not call an Application a build pipeline or claim the candidate used Argo CD unless their real background says so.',
+      'Do not call an Application a build pipeline. A worked example is not personal history.',
     ],
   },
   {
@@ -351,11 +351,11 @@ const TOPICS = [
     match: /(object storage|объектн\w* хранилищ|\bminio\b|\bceph\b)/i,
     guidance: [
       'Объектное хранилище хранит объекты по ключам внутри bucket и обычно доступно через HTTP API; это не обычная файловая система с теми же операциями. MinIO можно развернуть самостоятельно и работать с ним через S3-совместимый API.',
-      'Для реальной эксплуатации нужно отдельно продумать доступы, TLS, диски и отказоустойчивость, версии и lifecycle объектов, backup и восстановление. Не утверждай, что кандидат сам ставил MinIO или Ceph, если этого нет в его профиле.',
+      'Для реальной эксплуатации нужно отдельно продумать доступы, TLS, диски и отказоустойчивость, версии и lifecycle объектов, backup и восстановление. Не выдавай пример установки за личную биографию.',
     ],
     english: [
       'Object storage keeps objects under keys in buckets and is usually accessed through an HTTP API. It is not the same as a normal file system. MinIO is a self-hosted server with an S3-compatible API.',
-      'For production, plan access, TLS, disks and redundancy, object versioning, backups, and restore tests. Do not claim the candidate installed MinIO or Ceph unless the profile says so.',
+      'For production, plan access, TLS, disks and redundancy, object versioning, backups, and restore tests. Do not present an example setup as personal history.',
     ],
   },
   {
@@ -385,7 +385,7 @@ const TOPICS = [
     english: [
       'AppRole is a machine login method for Vault. By default, the client sends a RoleID and SecretID to auth/approle/login. Vault then returns a token with the role policies and token lifetime.',
       'GitLab CI can use a different flow: the job sends an ID token (JWT), and Vault checks its claims before giving access. Do not mix this with the RoleID and SecretID flow.',
-      'A SecretID is not a Vault token. Do not guess which login method Ansible uses unless the question or candidate background confirms it.',
+      'A SecretID is not a Vault token. Do not guess which login method Ansible uses unless the question specifies it.',
     ],
   },
   {

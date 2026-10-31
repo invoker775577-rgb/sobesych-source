@@ -9,13 +9,13 @@ import { createPracticeUtterance, resolvePracticeTranscriptionLanguage } from '.
 import { extractPracticeScores, summarizePracticeScores } from './practice-score.mjs'
 import { screenTaskFollowupMessages } from './screen-task.mjs'
 import { normalizeState } from './types'
-import type { Call, CandidateProfiles, LocalSpeech, Message, Model, PracticeLibrary, SavedState, Settings, Speaker } from './types'
+import type { Call, LocalSpeech, Message, Model, PracticeLibrary, SavedState, Settings, Speaker } from './types'
 import { UpdatePanel } from './UpdatePanel'
 import { createUsageRecord, formatUsd, providerLabel, summarizeUsage, upsertUsageRecord } from './usage.mjs'
 import type { UsageOperation, UsageRecord, UsageStatus } from './usage.mjs'
 import './App.css'
 
-const fallbackSettings: Settings = { hasKey: false, baseUrl: 'https://openrouter.ai/api/v1', model: 'qwen/qwen3-30b-a3b-instruct-2507', language: 'auto', microphoneId: 'default', candidateProfile: 'devops', autoAnswer: false, transcriptionMode: 'local', transcriptionBaseUrl: 'https://openrouter.ai/api/v1', transcriptionModel: 'openai/whisper-large-v3-turbo' }
+const fallbackSettings: Settings = { hasKey: false, baseUrl: 'https://openrouter.ai/api/v1', model: 'qwen/qwen3-30b-a3b-instruct-2507', language: 'auto', microphoneId: 'default', practiceProfile: 'devops', autoAnswer: false, transcriptionMode: 'local', transcriptionBaseUrl: 'https://openrouter.ai/api/v1', transcriptionModel: 'openai/whisper-large-v3-turbo' }
 const slowSpeechNotice = 'Распознавание задерживается. Подсказка появится после готовности вопроса; запрос уже принят.'
 const presets: Model[] = [{ id: 'qwen/qwen3-30b-a3b-instruct-2507', name: 'Qwen3 30B · рекомендуется' }, { id: 'mistralai/mistral-nemo', name: 'Mistral Nemo · эконом' }, { id: 'openrouter/free', name: 'Бесплатный роутер' }]
 const labels: Record<Speaker, string> = { interviewer: 'Собеседник', me: 'Вы', assistant: 'AI', note: 'Система' }
@@ -154,7 +154,7 @@ const AnswerHistory = memo(function AnswerHistory({ messages }: { messages: Mess
 
 function App() {
   const [practiceBank, setPracticeBank] = useState(emptyPracticeBank)
-  const [data, setData] = useState<SavedState>({ calls: [], profileContext: '', focus: '' })
+  const [data, setData] = useState<SavedState>({ calls: [] })
   const dataRef = useRef(data)
   const [settings, setSettings] = useState(fallbackSettings)
   const settingsRef = useRef(settings)
@@ -247,10 +247,6 @@ function App() {
   const overlayRequest = useRef(0)
   const [modal, setModal] = useState<'settings' | null>(null)
   const [configDraft, setConfigDraft] = useState<Settings & { apiKey: string }>({ ...settings, apiKey: '' })
-  const [candidateProfiles, setCandidateProfiles] = useState<CandidateProfiles>({ devops: '', support: '' })
-  const candidateProfilesRef = useRef(candidateProfiles)
-  const [candidateProfilesLocked, setCandidateProfilesLocked] = useState(false)
-  const [profileDrafts, setProfileDrafts] = useState<CandidateProfiles>({ devops: '', support: '' })
   const [saving, setSaving] = useState(false)
   const [localSpeech, setLocalSpeech] = useState<LocalSpeech | null>(null)
   const [installingGpu, setInstallingGpu] = useState(false)
@@ -296,7 +292,7 @@ function App() {
   const practiceReportAttempted = selected?.usage?.some(record => record.operation === 'practice-report') ?? false
   const practiceCanReport = Boolean(hasPracticeScenario && selected && selectedPracticeStep === selectedPracticeQuestionCount - 1 && practiceCanContinue && !practiceNeedsReview && practiceMicState === 'idle' && !busy && !practiceReportAttempted && !selected.practiceReportComplete)
   const historyUsage = useMemo(() => summarizeUsage(data.calls.flatMap(call => call.usage || [])), [data.calls])
-  const practiceProgress = useMemo(() => summarizePracticeScores(data.calls, settings.candidateProfile), [data.calls, settings.candidateProfile])
+  const practiceProgress = useMemo(() => summarizePracticeScores(data.calls, settings.practiceProfile), [data.calls, settings.practiceProfile])
   const selectedUsage = summarizeUsage(selected?.usage)
   const untrackedCalls = useMemo(() => data.calls.filter(call => !call.usageTracking && call.messages.some(item => item.speaker === 'assistant')).length, [data.calls])
   function persist(next: SavedState) {
@@ -325,7 +321,6 @@ function App() {
     return !liveId.current && !busyRef.current && !callStartingRef.current
   }
   function updateConfig(next: Settings) { settingsRef.current = next; setSettings(next) }
-  function updateCandidateProfiles(next: CandidateProfiles) { candidateProfilesRef.current = next; setCandidateProfiles(next) }
   function updateCall(id: string, update: (call: Call) => Call, save = true) { commit({ ...dataRef.current, calls: dataRef.current.calls.map(c => c.id === id ? update(c) : c) }, save) }
   function togglePracticeTimer(id: string) {
     if (practiceTimerRunningId === id) {
@@ -395,10 +390,6 @@ function App() {
       setProtectedCapture(Boolean(config.captureProtected))
       setOverlayModeState(Boolean(config.overlayMode))
       if (config.historyWarning) setError(config.historyWarning)
-      const loadedProfiles = config.candidateProfiles || { devops: '', support: '' }
-      if (config.candidateProfilesStatus === 'locked') {
-        setError('Профили не удалось расшифровать. Старые данные сохранены, проверь учётную запись Windows.')
-      }
       const savedLibraries = Array.isArray(config.practiceLibraries) ? config.practiceLibraries : []
       setPracticeLibraries(savedLibraries)
       if (savedLibraries[0]) {
@@ -406,15 +397,14 @@ function App() {
         setActivePracticeLibraryId(savedLibraries[0].id)
       }
       if (config.practiceLibrariesStatus === 'locked' && config.practiceLibrariesWarning) setNotice(config.practiceLibrariesWarning)
-      updateCandidateProfiles(loadedProfiles)
-      setCandidateProfilesLocked(config.candidateProfilesStatus === 'locked')
       let saved = config.state
       if (!saved) {
         try {
           const previous = JSON.parse(localStorage.getItem('sobesych:v3') || 'null')
-          if (previous) saved = { calls: Array.isArray(previous.messages) ? [{ id: crypto.randomUUID(), createdAt: new Date().toISOString(), duration: 0, messages: previous.messages }] : [], profileContext: previous.profileContext || '', focus: '' }
+          if (previous) saved = { calls: Array.isArray(previous.messages) ? [{ id: crypto.randomUUID(), createdAt: new Date().toISOString(), duration: 0, messages: previous.messages }] : [] }
         } catch { /* Corrupt legacy data must not prevent startup. */ }
       }
+      localStorage.removeItem('sobesych:v3')
       commit(normalizeState(saved)); updateConfig({ ...config.settings, autoAnswer: false }); setVersion(config.version); setLocalSpeech(config.localSpeech || null); readyRef.current = true; setReady(true)
       if (config.settings.autoAnswer) void window.sobesych.saveSettings({ autoAnswer: false })
     }
@@ -739,7 +729,7 @@ function App() {
       if (!['screen', 'extract-task', 'summary', 'expand'].includes(mode) && !followupMessages && !latestInterviewerMessage(requestMessages)) {
         throw new Error('Не удалось разобрать свежую реплику собеседника. Повтори вопрос или введи его вручную.')
       }
-      const fingerprint = JSON.stringify([requestMessages.filter(m => m.speaker !== 'assistant'), followupMessages ? task?.answerId : '', settingsRef.current.model, settingsRef.current.baseUrl, settingsRef.current.candidateProfile, candidateProfilesRef.current[settingsRef.current.candidateProfile]])
+      const fingerprint = JSON.stringify([requestMessages.filter(m => m.speaker !== 'assistant'), followupMessages ? task?.answerId : '', settingsRef.current.model, settingsRef.current.baseUrl])
       trace('selected')
       const answerKey = `${id}:${mode}`
       if (mode === 'answer' && answered.current.get(answerKey) === fingerprint) {
@@ -757,7 +747,6 @@ function App() {
       }
       if (!isCurrent()) return
       const capturedAt = new Date().toISOString()
-      const profileContext = singleAttempt || screenshot || ['screen', 'extract-task'].includes(mode) ? '' : candidateProfilesRef.current[settingsRef.current.candidateProfile]
       const requestSettings = settingsRef.current
       const provider = providerLabel(requestSettings.baseUrl)
       const operation: UsageOperation = mode === 'extract-task' ? 'screen' : mode as UsageOperation
@@ -772,7 +761,7 @@ function App() {
       trackUsage(id, createUsageRecord({ id: requestId, operation, provider, model: requestSettings.model, status: 'pending' }))
       trace('requested')
       const result = await window.sobesych.assist({
-        requestId, mode, messages: requestMessages, profileContext, partialQuestion: Boolean(liveDraft),
+        requestId, mode, messages: requestMessages, partialQuestion: Boolean(liveDraft),
         ...(Number.isSafeInteger(maxTokens) ? { maxTokens } : {}), ...(singleAttempt ? { singleAttempt: true } : {}),
         focus: mode === 'practice-report' && selectedPracticeTitle
           ? `Тренировочный сценарий: ${selectedPracticeTitle}; ${selectedPracticeQuestionCount} основных вопросов.`
@@ -833,7 +822,7 @@ function App() {
       if (shot.error) throw new Error(shot.error)
       if (!shot.screenshot) throw new Error('Снимок выбранной области не получен')
       const createdAt = new Date().toISOString()
-      const call: Call = { id: crypto.randomUUID(), createdAt, duration: 0, kind: 'practice', practiceProfile: settingsRef.current.candidateProfile, messages: [], usage: [], usageTracking: 'complete', transcriptionMode: 'local' }
+      const call: Call = { id: crypto.randomUUID(), createdAt, duration: 0, kind: 'practice', practiceProfile: settingsRef.current.practiceProfile, messages: [], usage: [], usageTracking: 'complete', transcriptionMode: 'local' }
       commit({ ...dataRef.current, calls: [call, ...dataRef.current.calls] })
       choose(call.id); setView('call')
       await ask('extract-task', false, shot.screenshot)
@@ -907,7 +896,7 @@ function App() {
     if (liveCallId || busyRef.current || practiceMicState !== 'idle') return
     const createdAt = new Date().toISOString()
     const track = practiceTracks.find(item => item.id === practiceTrackChoice)
-    const call: Call = { id: crypto.randomUUID(), createdAt, duration: 0, kind: 'practice', practiceProfile: settingsRef.current.candidateProfile, ...(track ? { practiceTrackId: track.id, practiceTrackStep: 0 } : {}), messages: [message('interviewer', question, createdAt), message('me', answer, createdAt)], usage: [], usageTracking: 'complete', transcriptionMode: 'local' }
+    const call: Call = { id: crypto.randomUUID(), createdAt, duration: 0, kind: 'practice', practiceProfile: settingsRef.current.practiceProfile, ...(track ? { practiceTrackId: track.id, practiceTrackStep: 0 } : {}), messages: [message('interviewer', question, createdAt), message('me', answer, createdAt)], usage: [], usageTracking: 'complete', transcriptionMode: 'local' }
     commit({ ...dataRef.current, calls: [call, ...dataRef.current.calls] })
     choose(call.id); setDraft(''); setPracticeQuestion(''); setPracticeQuestionChoice(''); setPracticeTrackChoice(''); setPracticeAnswer(''); setView('call')
     void ask('review')
@@ -1020,7 +1009,7 @@ function App() {
     const createdAt = new Date().toISOString()
     const call: Call = {
       id: crypto.randomUUID(), createdAt, duration: 0, kind: 'practice',
-      practiceProfile: settingsRef.current.candidateProfile,
+      practiceProfile: settingsRef.current.practiceProfile,
       practiceTrackId: 'transcript:ru', practiceTrackStep: 0,
       practiceQuestionSet: {
         title: practiceTranscriptSource === 'all' ? transcriptQuestions.fileName : transcriptQuestions.sourceNames[Number(practiceTranscriptSource)] || transcriptQuestions.fileName,
@@ -1039,7 +1028,7 @@ function App() {
     const createdAt = new Date().toISOString()
     const call: Call = {
       id: crypto.randomUUID(), createdAt, duration: 0, kind: 'practice',
-      practiceProfile: settingsRef.current.candidateProfile,
+      practiceProfile: settingsRef.current.practiceProfile,
       practiceTrackId: track.id, practiceTrackStep: 0,
       messages: [message('interviewer', firstQuestion.question, createdAt)],
       usage: [], usageTracking: 'complete', transcriptionMode: 'local',
@@ -1096,7 +1085,7 @@ function App() {
     } catch (e) { setError(errorText(e)) }
   }
   function openSettings() {
-    setConfigDraft({ ...settings, apiKey: '' }); setProfileDrafts(candidateProfiles); setModelTestArmed(false); setAudioDiagnostic(current => ({ ...current, state: 'idle', sources: { me: inactive, interviewer: inactive }, pending: false })); setModal('settings')
+    setConfigDraft({ ...settings, apiKey: '' }); setModelTestArmed(false); setAudioDiagnostic(current => ({ ...current, state: 'idle', sources: { me: inactive, interviewer: inactive }, pending: false })); setModal('settings')
     void navigator.mediaDevices.enumerateDevices().then(list => setDevices(list.filter(d => d.kind === 'audioinput'))).catch(e => setError(errorText(e)))
     void window.sobesych?.models().then(result => { if (result.models?.length) setModels(result.models); else if (result.error) setNotice(`Каталог недоступен: ${result.error}`) }).catch(e => setNotice(errorText(e)))
   }
@@ -1201,15 +1190,14 @@ function App() {
     if (saving) return
     setSaving(true)
     try {
-      const result = await window.sobesych!.saveSettings({ ...configDraft, autoAnswer: false, ...(!candidateProfilesLocked ? { candidateProfiles: profileDrafts } : {}) })
+      const result = await window.sobesych!.saveSettings({ ...configDraft, autoAnswer: false })
       if (result.error) throw new Error(result.error)
       const inferenceChanged = result.settings.model !== settingsRef.current.model
         || result.settings.baseUrl !== settingsRef.current.baseUrl
-        || result.settings.candidateProfile !== settingsRef.current.candidateProfile
+        || result.settings.practiceProfile !== settingsRef.current.practiceProfile
         || Boolean(configDraft.apiKey.trim())
-        || (!candidateProfilesLocked && profileDrafts[result.settings.candidateProfile] !== candidateProfilesRef.current[result.settings.candidateProfile])
       if (inferenceChanged) { cancelAnswer(); answered.current.clear() }
-      updateConfig(result.settings); if (!candidateProfilesLocked) updateCandidateProfiles(profileDrafts); setConfigDraft({ ...result.settings, apiKey: '' }); setModelTestArmed(false); setModal(null); setError(''); setNotice(candidateProfilesLocked ? 'Настройки сохранены; профиль оставлен без изменений' : 'Настройки сохранены')
+      updateConfig(result.settings); setConfigDraft({ ...result.settings, apiKey: '' }); setModelTestArmed(false); setModal(null); setError(''); setNotice('Настройки сохранены')
     } catch (e) { setError(errorText(e)) } finally { setSaving(false) }
   }
   function testSelectedModel() {
@@ -1225,7 +1213,7 @@ function App() {
     const question = 'Что делает EXPOSE 8080 в Dockerfile и открывает ли он порт на хосте?'
     const attempt = 'EXPOSE 8080 публикует порт контейнера на хосте, поэтому отдельный проброс через docker run не нужен.'
     const call: Call = {
-      id: crypto.randomUUID(), createdAt, duration: 0, kind: 'practice', practiceProfile: requestSettings.candidateProfile,
+      id: crypto.randomUUID(), createdAt, duration: 0, kind: 'practice', practiceProfile: requestSettings.practiceProfile,
       practiceQuestionSet: { title: 'Проверка модели', questions: [question, 'Как опубликовать порт контейнера на хосте?'] },
       messages: [message('interviewer', question, createdAt), message('me', attempt, createdAt)],
       usage: [], usageTracking: 'complete', transcriptionMode: 'local',
@@ -1237,8 +1225,8 @@ function App() {
   }
   const historyCalls = useMemo(() => practiceOnlyBuild ? data.calls.filter(call => call.kind === 'practice') : data.calls, [data.calls])
   const filtered = useMemo(() => view === 'history' ? historyCalls.filter(c => !search || c.messages.some(m => m.text.toLowerCase().includes(search.toLowerCase())) || new Date(c.createdAt).toLocaleDateString('ru-RU').includes(search)) : [], [historyCalls, search, view])
-  const practiceQuestions = practiceOnlyBuild ? practiceBank.getPracticeQuestions(settings.candidateProfile) : []
-  const practiceTracks = practiceOnlyBuild ? practiceBank.getPracticeTracks(settings.candidateProfile) : []
+  const practiceQuestions = practiceOnlyBuild ? practiceBank.getPracticeQuestions(settings.practiceProfile) : []
+  const practiceTracks = practiceOnlyBuild ? practiceBank.getPracticeTracks(settings.practiceProfile) : []
   const practiceQuestionsRu = practiceQuestions.filter(question => question.language === 'ru')
   const practiceQuestionsEn = practiceQuestions.filter(question => question.language === 'en')
   const practiceTracksRu = practiceTracks.filter(track => track.language === 'ru')
@@ -1419,7 +1407,7 @@ function App() {
         {modelInfo?.pricing && <p className="price">За 1 млн токенов: ввод ${Number(modelInfo.pricing.prompt) * 1_000_000}, вывод ${Number(modelInfo.pricing.completion) * 1_000_000}{modelInfo.modalities?.includes('image') ? ' · Поддерживает картинки' : ''}</p>}
         {practiceOnlyBuild && <section className="model-test" aria-label="Проверка модели">
           <h3>Проверить выбранную модель</h3>
-          <p>Один короткий разбор без профиля кандидата. Ответ ограничен 220 токенами; автоповтора и запасной модели не будет. Если провайдер вернёт стоимость, она появится в истории.</p>
+          <p>Один короткий разбор. Ответ ограничен 220 токенами; автоповтора и запасной модели не будет. Если провайдер вернёт стоимость, она появится в истории.</p>
           <div>
             <button onClick={testSelectedModel} disabled={!settings.hasKey || !ready || busy || Boolean(liveCallId) || practiceMicState !== 'idle' || Boolean(configDraft.apiKey.trim()) || configDraft.model !== settings.model || configDraft.baseUrl !== settings.baseUrl}>{modelTestArmed ? 'Отправить один запрос' : 'Подготовить проверку'}</button>
             {modelTestArmed && <button onClick={() => setModelTestArmed(false)} disabled={busy}>Отмена</button>}
@@ -1427,9 +1415,7 @@ function App() {
           {!settings.hasKey && <small>Сначала сохрани ключ OpenRouter.</small>}
           {(configDraft.model !== settings.model || configDraft.baseUrl !== settings.baseUrl || configDraft.apiKey.trim()) && <small>Сначала сохрани изменения настроек.</small>}
         </section>}
-        <label>Профиль кандидата<select value={configDraft.candidateProfile} onChange={e => setConfigDraft({ ...configDraft, candidateProfile: e.target.value as Settings['candidateProfile'] })}><option value="devops">DevOps</option><option value="support">Technical Support</option></select></label>
-        <label>Подтверждённый опыт · {configDraft.candidateProfile === 'devops' ? 'DevOps' : 'Technical Support'}<textarea aria-label={`Профиль опыта ${configDraft.candidateProfile}`} rows={12} maxLength={30000} readOnly={candidateProfilesLocked} value={profileDrafts[configDraft.candidateProfile]} onChange={event => setProfileDrafts({ ...profileDrafts, [configDraft.candidateProfile]: event.target.value })} placeholder="Добавь реальные проекты, личную зону ответственности, действия и результаты. Отдельно укажи, чего ты не делал." /></label>
-        <p className="profile-privacy">{candidateProfilesLocked ? 'Windows не расшифровала сохранённый профиль. Он не изменяется.' : 'Профили зашифрованы на этом компьютере и передаются модели только для вопросов о твоём опыте.'}</p>
+        {practiceOnlyBuild && <label>Тема тренировки<select value={configDraft.practiceProfile} onChange={e => setConfigDraft({ ...configDraft, practiceProfile: e.target.value as Settings['practiceProfile'] })}><option value="devops">DevOps</option><option value="support">Technical Support</option></select></label>}
         <label>Микрофон<select value={configDraft.microphoneId} disabled={phase !== 'idle' || audioDiagnostic.state !== 'idle'} onChange={e => setConfigDraft({ ...configDraft, microphoneId: e.target.value })}><option value="default">По умолчанию Windows</option>{devices.filter(d => d.deviceId !== 'default' && d.deviceId !== 'communications').map((d, i) => <option key={d.deviceId} value={d.deviceId}>{d.label || `Микрофон ${i + 1}`}</option>)}</select></label>
         <section className="audio-diagnostic" aria-label="Проверка микрофона и системного звука">
           <h3>Проверка звука</h3>

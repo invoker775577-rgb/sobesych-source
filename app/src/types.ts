@@ -4,11 +4,10 @@ import type { UsageRecord } from './usage.mjs'
 import { normalizeUsageRecord } from './usage.mjs'
 import { normalizePracticeScores } from './practice-score.mjs'
 export type PracticeScores = { accuracy: number; directness: number; specificity: number; naturalness: number }
-export type CandidateProfiles = { devops: string; support: string }
 export type PracticeLibrary = { id: string; title: string; createdAt: string; sourceNames: string[]; sourceQuestionCounts: number[]; questions: string[]; questionSources: number[][]; unlabelledFileCount: number; emptyFileCount: number }
 export type Call = { id: string; createdAt: string; duration: number; messages: Message[]; kind?: 'call' | 'practice'; practiceProfile?: 'devops' | 'support'; practiceScores?: PracticeScores; practiceTrackId?: string; practiceTrackStep?: number; practiceQuestionSet?: { title: string; questions: string[] }; practiceReportComplete?: boolean; usage?: UsageRecord[]; usageTracking?: 'complete' | 'partial'; transcriptionMode?: 'local' | 'openrouter' }
-export type SavedState = { calls: Call[]; profileContext: string; focus: string }
-export type Settings = { hasKey: boolean; baseUrl: string; model: string; language: string; microphoneId: string; candidateProfile: 'devops' | 'support'; autoAnswer: boolean; transcriptionMode: 'local' | 'openrouter'; transcriptionBaseUrl: string; transcriptionModel: string }
+export type SavedState = { calls: Call[] }
+export type Settings = { hasKey: boolean; baseUrl: string; model: string; language: string; microphoneId: string; practiceProfile: 'devops' | 'support'; autoAnswer: boolean; transcriptionMode: 'local' | 'openrouter'; transcriptionBaseUrl: string; transcriptionModel: string }
 export type LocalSpeech = { running: boolean; backend: 'cpu' | 'cuda' | null; cudaInstalled: boolean; gpuSupported: boolean }
 export type Model = { id: string; name: string; pricing?: { prompt: string; completion: string }; modalities?: string[] }
 type Result = { error?: string; ok?: boolean }
@@ -17,18 +16,18 @@ export type UpdateState = { phase: 'disabled' | 'idle' | 'checking' | 'available
 declare global {
   interface Window {
     sobesych?: {
-      getConfig(): Promise<Result & { settings: Settings; state: SavedState | null; candidateProfiles: CandidateProfiles; candidateProfilesStatus: 'empty' | 'ready' | 'locked'; practiceLibraries: PracticeLibrary[]; practiceLibrariesStatus: 'empty' | 'ready' | 'locked'; practiceLibrariesWarning?: string; historyWarning?: string; captureProtected?: boolean; overlayMode?: boolean; localSpeech?: LocalSpeech; practiceOnly: boolean; version: string }>
+      getConfig(): Promise<Result & { settings: Settings; state: SavedState | null; practiceLibraries: PracticeLibrary[]; practiceLibrariesStatus: 'empty' | 'ready' | 'locked'; practiceLibrariesWarning?: string; historyWarning?: string; captureProtected?: boolean; overlayMode?: boolean; localSpeech?: LocalSpeech; practiceOnly: boolean; version: string }>
       getUpdateState(): Promise<UpdateState>
       checkUpdate(): Promise<UpdateState>
       downloadUpdate(): Promise<UpdateState>
       installUpdate(): Promise<Result>
       setUpdateBusy(value: boolean): Promise<Result>
       onUpdateState(callback: (value: UpdateState) => void): () => void
-      saveSettings(value: Partial<Settings> & { apiKey?: string; candidateProfiles?: CandidateProfiles }): Promise<Result & { settings: Settings }>
+      saveSettings(value: Partial<Settings> & { apiKey?: string }): Promise<Result & { settings: Settings }>
       saveState(value: SavedState): Promise<Result>
       traceAnswer(value: { requestId: string; stage: string; reason?: string; elapsedMs: number }): Promise<Result>
       savePracticeLibraries(value: PracticeLibrary[]): Promise<Result>
-      assist(value: { requestId: string; mode: string; messages: Message[]; profileContext: string; focus: string; screenshot?: string; screenLanguage?: 'ru' | 'en'; partialQuestion?: boolean; maxTokens?: number; singleAttempt?: boolean }): Promise<Result & { answer?: string } & UsageResult>
+      assist(value: { requestId: string; mode: string; messages: Message[]; focus?: string; screenshot?: string; screenLanguage?: 'ru' | 'en'; partialQuestion?: boolean; maxTokens?: number; singleAttempt?: boolean }): Promise<Result & { answer?: string } & UsageResult>
       onAnswerDelta(callback: (event: { requestId: string; text: string }) => void): () => void
       transcribe(value: { audio: string; localOnly?: boolean; provisional?: boolean; source?: 'me' | 'interviewer'; requestId?: string; language?: 'auto' | 'ru' | 'en' }): Promise<Result & { text?: string } & UsageResult & { text?: string }>
       warmLocalTranscription(): Promise<Result & { previewEnabled?: boolean; backend?: 'cpu' | 'cuda' }>
@@ -76,5 +75,5 @@ export function normalizeState(value: unknown): SavedState {
       messages: c.messages.filter(m => m && typeof m.id === 'string' && typeof m.text === 'string' && speakers.includes(m.speaker) && !Number.isNaN(Date.parse(m.createdAt))),
     }
   }) : []
-  return { calls, profileContext: typeof state?.profileContext === 'string' ? state.profileContext : '', focus: typeof state?.focus === 'string' ? state.focus : '' }
+  return { calls }
 }

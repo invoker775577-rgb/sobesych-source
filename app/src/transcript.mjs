@@ -203,6 +203,7 @@ export function isExperienceQuestion(text = '') {
 }
 
 const personalStoryPatterns = [
+  /(?:tell\s+me\s+about|describe)\s+your\s+(?:(?:last|latest|recent)\s+)?(?:task|case|project|incident|work)\b/iu,
   /^(?:(?:ну|а|и|давай)[,\s]+)?кейсы?[,\s]+как\s+(?:ты|вы)(?=$|[^\p{L}\p{N}_])/iu,
   /(?:расскаж\p{L}*|опиши\p{L}*).{0,48}кейс\p{L}*/iu,
   /(?:tell\s+me\s+about|describe)\s+(?:a|an)\s+(?:work|production|technical)\s+case\b/iu,

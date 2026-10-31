@@ -93,7 +93,6 @@ p { overflow-wrap: anywhere; }
 .practice-voice span { color: #9ca8af; font-size: 13px; }
 .practice-voice .practice-recording { color: #ffd6d8; border-color: #93434a; background: #3c2023; }
 .practice-privacy { margin: 12px 0 0; color: #88949b; font-size: 12px; }
-.profile-privacy { margin: -10px 0 0; color: #88949b; font-size: 12px; line-height: 1.45; }
 .section-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .stats { display: flex; gap: 40px; flex-wrap: wrap; padding: 25px 0; }
 .stats span { color: #acb6bf; }

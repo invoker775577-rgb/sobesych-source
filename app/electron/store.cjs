@@ -1,6 +1,6 @@
 const fs = require('node:fs')
 const path = require('node:path')
-const CURRENT_SETTINGS_VERSION = 8
+const CURRENT_SETTINGS_VERSION = 9
 const MAX_HISTORY_BYTES = 20_000_000
 const MAX_PRACTICE_LIBRARY_BYTES = 8_000_000
 const MAX_PRACTICE_LIBRARIES = 10
@@ -8,7 +8,6 @@ const MAX_PRACTICE_QUESTIONS = 5_000
 const MAX_TOTAL_PRACTICE_QUESTIONS = 10_000
 const MAX_PRACTICE_SOURCES = 50
 const HISTORY_BACKUP_INTERVAL_MS = 60_000
-const MAX_PROFILE_CHARS = 30_000
 function readJson(file, fallback) {
   try { return JSON.parse(fs.readFileSync(file, 'utf8')) } catch { return fallback }
 }
@@ -29,21 +28,35 @@ function writeJson(file, value) {
 function serializeHistory(value) {
   if (!Array.isArray(value?.calls) || value.calls.length > 1000) throw new Error('История слишком большая или повреждена')
   let serialized
-  try { serialized = JSON.stringify(value) } catch { throw new Error('История слишком большая или повреждена') }
+  try { serialized = JSON.stringify(withoutPersonalization(value)) } catch { throw new Error('История слишком большая или повреждена') }
   if (typeof serialized !== 'string' || Buffer.byteLength(serialized) > MAX_HISTORY_BYTES) {
     throw new Error('История слишком большая или повреждена')
   }
   return serialized
 }
-function normalizeCandidateProfiles(value) {
-  const source = value && typeof value === 'object' ? value : {}
-  const profiles = {}
-  for (const name of ['devops', 'support']) {
-    const text = typeof source[name] === 'string' ? source[name].trim() : ''
-    if (text.length > MAX_PROFILE_CHARS) throw new Error('Профиль слишком большой')
-    profiles[name] = text
+function withoutPersonalization(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return value
+  const clean = { ...value }
+  for (const key of ['encryptedProfiles', 'candidateProfiles', 'profileContext', 'focus', 'candidateProfile']) delete clean[key]
+  if (value.settings && typeof value.settings === 'object') {
+    clean.settings = withoutPersonalization(value.settings)
+    // This is only the subject of the separate Practice app, never candidate facts.
+    if (!clean.settings.practiceProfile && ['devops', 'support'].includes(value.settings.candidateProfile)) clean.settings.practiceProfile = value.settings.candidateProfile
   }
-  return profiles
+  return clean
+}
+function removeLegacyPersonalization(directory) {
+  if (!fs.existsSync(directory)) return
+  // Only our structured settings/history files; do not edit conversation messages.
+  for (const name of fs.readdirSync(directory)) {
+    if (!/^(?:settings|calls)\.json(?:\.(?:bak|tmp)|\.corrupt-[\w.-]+)?$/.test(name)) continue
+    const file = path.join(directory, name)
+    if (!fs.statSync(file).isFile() || fs.statSync(file).size > MAX_HISTORY_BYTES) continue
+    let value
+    try { value = JSON.parse(fs.readFileSync(file, 'utf8')) } catch { continue }
+    const cleaned = withoutPersonalization(value)
+    if (JSON.stringify(value) !== JSON.stringify(cleaned)) writeJson(file, cleaned)
+  }
 }
 function normalizePracticeLibraries(value) {
   if (!Array.isArray(value) || value.length > MAX_PRACTICE_LIBRARIES) throw new Error('Наборы вопросов повреждены или превышают лимит')
@@ -90,7 +103,7 @@ function readHistory(file) {
   if (fs.statSync(file).size > MAX_HISTORY_BYTES) throw new Error('Файл истории больше допустимого размера')
   const value = JSON.parse(fs.readFileSync(file, 'utf8'))
   if (!Array.isArray(value?.calls) || value.calls.length > 1000) throw new Error('В файле истории нет допустимого списка звонков')
-  return value
+  return withoutPersonalization(value)
 }
 function preserveBrokenFile(file) {
   const stamp = new Date().toISOString().replace(/[:.]/g, '-')
@@ -102,6 +115,13 @@ function preserveBrokenFile(file) {
 }
 function createStore(directory, safeStorage, initial, normalize) {
   const file = path.join(directory, 'settings.json')
+  if (Number(readJson(file, {}).settingsVersion || 0) < CURRENT_SETTINGS_VERSION) {
+    removeLegacyPersonalization(directory)
+    const backups = `${directory}-backups`
+    if (fs.existsSync(backups)) for (const entry of fs.readdirSync(backups, { withFileTypes: true })) {
+      if (entry.isDirectory() && !entry.isSymbolicLink()) removeLegacyPersonalization(path.join(backups, entry.name))
+    }
+  }
   const historyFile = path.join(directory, 'calls.json')
   const historyBackup = `${historyFile}.bak`
   const practiceLibraryFile = path.join(directory, 'practice-library.enc')
@@ -116,15 +136,6 @@ function createStore(directory, safeStorage, initial, normalize) {
   try { if (saved.encryptedKey) apiKey = safeStorage.decryptString(Buffer.from(saved.encryptedKey, 'base64')) } catch { /* Migration can use the local environment key. */ }
   let settings
   try { settings = normalize(saved.settings || {}, { ...initial, apiKey }) } catch { settings = normalize({}, { ...initial, apiKey }) }
-  let candidateProfiles = { devops: '', support: '' }
-  let profilesLocked = false
-  let encryptedProfiles = typeof saved.encryptedProfiles === 'string' ? saved.encryptedProfiles : ''
-  if (encryptedProfiles) {
-    try {
-      if (!safeStorage.isEncryptionAvailable()) throw new Error('Windows encryption is unavailable')
-      candidateProfiles = normalizeCandidateProfiles(JSON.parse(safeStorage.decryptString(Buffer.from(encryptedProfiles, 'base64'))))
-    } catch { profilesLocked = true }
-  }
   if (fs.existsSync(practiceLibraryFile)) {
     try {
       if (!safeStorage.isEncryptionAvailable()) throw new Error('Windows encryption is unavailable')
@@ -146,22 +157,11 @@ function createStore(directory, safeStorage, initial, normalize) {
   if (Number(saved.settingsVersion || 0) < 5 && settings.language === 'ru') settings = normalize({ language: 'auto' }, settings)
   const publicConfig = () => { const { apiKey, ...rest } = settings; return { ...rest, hasKey: Boolean(apiKey) } }
   const saveSettings = update => {
-    const { candidateProfiles: profileUpdate, ...settingsUpdate } = update || {}
-    const next = normalize(settingsUpdate, settings)
+    const next = normalize(withoutPersonalization(update || {}), settings)
     if (next.apiKey && !safeStorage.isEncryptionAvailable()) throw new Error('Windows не может зашифровать ключ. Настройки не сохранены.')
-    let nextProfiles = candidateProfiles
-    let nextEncryptedProfiles = encryptedProfiles
-    if (profileUpdate !== undefined) {
-      if (profilesLocked) throw new Error('Профиль не расшифрован Windows. Он не был изменён.')
-      if (!safeStorage.isEncryptionAvailable()) throw new Error('Windows не может зашифровать профиль. Настройки не сохранены.')
-      nextProfiles = normalizeCandidateProfiles(profileUpdate)
-      nextEncryptedProfiles = safeStorage.encryptString(JSON.stringify(nextProfiles)).toString('base64')
-    }
     const { apiKey, ...rest } = next
-    writeJson(file, { settings: rest, encryptedKey: apiKey ? safeStorage.encryptString(apiKey).toString('base64') : '', encryptedProfiles: nextEncryptedProfiles, settingsVersion: CURRENT_SETTINGS_VERSION })
+    writeJson(file, { settings: rest, encryptedKey: apiKey ? safeStorage.encryptString(apiKey).toString('base64') : saved.encryptedKey || '', settingsVersion: CURRENT_SETTINGS_VERSION })
     settings = next
-    candidateProfiles = nextProfiles
-    encryptedProfiles = nextEncryptedProfiles
     return publicConfig()
   }
   const savePracticeLibraries = value => {
@@ -237,8 +237,6 @@ function createStore(directory, safeStorage, initial, normalize) {
   }
   return {
     publicConfig, saveSettings, getSettings: () => ({ ...settings }),
-    getCandidateProfiles: () => ({ ...candidateProfiles }),
-    candidateProfilesStatus: () => profilesLocked ? 'locked' : Object.values(candidateProfiles).some(Boolean) ? 'ready' : 'empty',
     getPracticeLibraries: () => JSON.parse(JSON.stringify(practiceLibraries)),
     practiceLibrariesStatus: () => practiceLibrariesLocked ? 'locked' : practiceLibraries.length ? 'ready' : 'empty',
     practiceLibrariesWarning: () => practiceLibrariesWarning,
@@ -246,4 +244,4 @@ function createStore(directory, safeStorage, initial, normalize) {
     loadState, historyWarning: () => historyWarning, saveState,
   }
 }
-module.exports = { createStore, readJson, writeJson, normalizeCandidateProfiles, normalizePracticeLibraries }
+module.exports = { createStore, readJson, writeJson, normalizePracticeLibraries, removeLegacyPersonalization }

@@ -187,7 +187,7 @@ else {
     })
     handle('app:config', () => {
       const { pid: _pid, ...localSpeech } = localStt.status()
-      return { settings: store.publicConfig(), state: store.loadState(), candidateProfiles: store.getCandidateProfiles(), candidateProfilesStatus: store.candidateProfilesStatus(), practiceLibraries: store.getPracticeLibraries(), practiceLibrariesStatus: store.practiceLibrariesStatus(), practiceLibrariesWarning: store.practiceLibrariesWarning(), historyWarning: store.historyWarning(), captureProtected: mainWindow.isContentProtected(), overlayMode, localSpeech, practiceOnly: practiceOnlyBuild, version: app.getVersion() }
+      return { settings: store.publicConfig(), state: store.loadState(), practiceLibraries: store.getPracticeLibraries(), practiceLibrariesStatus: store.practiceLibrariesStatus(), practiceLibrariesWarning: store.practiceLibrariesWarning(), historyWarning: store.historyWarning(), captureProtected: mainWindow.isContentProtected(), overlayMode, localSpeech, practiceOnly: practiceOnlyBuild, version: app.getVersion() }
     })
     handle('settings:save', update => {
       const settings = store.saveSettings(update)
