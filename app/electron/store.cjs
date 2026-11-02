@@ -28,7 +28,7 @@ function writeJson(file, value) {
 function serializeHistory(value) {
   if (!Array.isArray(value?.calls) || value.calls.length > 1000) throw new Error('История слишком большая или повреждена')
   let serialized
-  try { serialized = JSON.stringify(withoutPersonalization(value)) } catch { throw new Error('История слишком большая или повреждена') }
+  try { serialized = JSON.stringify(value) } catch { throw new Error('История слишком большая или повреждена') }
   if (typeof serialized !== 'string' || Buffer.byteLength(serialized) > MAX_HISTORY_BYTES) {
     throw new Error('История слишком большая или повреждена')
   }
@@ -45,18 +45,14 @@ function withoutPersonalization(value) {
   }
   return clean
 }
-function removeLegacyPersonalization(directory) {
-  if (!fs.existsSync(directory)) return
-  // Only our structured settings/history files; do not edit conversation messages.
-  for (const name of fs.readdirSync(directory)) {
-    if (!/^(?:settings|calls)\.json(?:\.(?:bak|tmp)|\.corrupt-[\w.-]+)?$/.test(name)) continue
-    const file = path.join(directory, name)
-    if (!fs.statSync(file).isFile() || fs.statSync(file).size > MAX_HISTORY_BYTES) continue
-    let value
-    try { value = JSON.parse(fs.readFileSync(file, 'utf8')) } catch { continue }
-    const cleaned = withoutPersonalization(value)
-    if (JSON.stringify(value) !== JSON.stringify(cleaned)) writeJson(file, cleaned)
+function legacyMetadata(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
+  const retained = {}
+  for (const key of ['encryptedProfiles', 'candidateProfiles', 'profileContext', 'focus', 'candidateProfile']) {
+    if (Object.hasOwn(value, key)) retained[key] = value[key]
   }
+  if (value.settings && typeof value.settings === 'object') retained.settings = legacyMetadata(value.settings)
+  return retained
 }
 function normalizePracticeLibraries(value) {
   if (!Array.isArray(value) || value.length > MAX_PRACTICE_LIBRARIES) throw new Error('Наборы вопросов повреждены или превышают лимит')
@@ -103,7 +99,7 @@ function readHistory(file) {
   if (fs.statSync(file).size > MAX_HISTORY_BYTES) throw new Error('Файл истории больше допустимого размера')
   const value = JSON.parse(fs.readFileSync(file, 'utf8'))
   if (!Array.isArray(value?.calls) || value.calls.length > 1000) throw new Error('В файле истории нет допустимого списка звонков')
-  return withoutPersonalization(value)
+  return value
 }
 function preserveBrokenFile(file) {
   const stamp = new Date().toISOString().replace(/[:.]/g, '-')
@@ -115,27 +111,68 @@ function preserveBrokenFile(file) {
 }
 function createStore(directory, safeStorage, initial, normalize) {
   const file = path.join(directory, 'settings.json')
-  if (Number(readJson(file, {}).settingsVersion || 0) < CURRENT_SETTINGS_VERSION) {
-    removeLegacyPersonalization(directory)
-    const backups = `${directory}-backups`
-    if (fs.existsSync(backups)) for (const entry of fs.readdirSync(backups, { withFileTypes: true })) {
-      if (entry.isDirectory() && !entry.isSymbolicLink()) removeLegacyPersonalization(path.join(backups, entry.name))
-    }
-  }
+  const settingsBackup = `${file}.bak`
   const historyFile = path.join(directory, 'calls.json')
   const historyBackup = `${historyFile}.bak`
   const practiceLibraryFile = path.join(directory, 'practice-library.enc')
   let historyWarning = ''
   let lastSavedHistory = null
   let lastBackupAt = 0
+  let retainedHistory = {}
   let practiceLibraries = []
   let practiceLibrariesLocked = false
   let practiceLibrariesWarning = ''
-  const saved = readJson(file, {})
+  const settingsWarnings = []
+  let settingsLocked = false
+  const invalidSettings = error => error instanceof SyntaxError || error.code === 'INVALID_SETTINGS'
+  const readSettings = target => {
+    const raw = fs.readFileSync(target, 'utf8')
+    const value = JSON.parse(raw)
+    const object = item => item && typeof item === 'object' && !Array.isArray(item)
+    if (!object(value) || (value.settings !== undefined && !object(value.settings)) ||
+        (value.encryptedKey !== undefined && typeof value.encryptedKey !== 'string')) {
+      throw Object.assign(new Error('Формат настроек повреждён'), { code: 'INVALID_SETTINGS' })
+    }
+    try { normalize(withoutPersonalization({ settings: value.settings || {} }).settings, initial) }
+    catch { throw Object.assign(new Error('Сохранённые настройки недопустимы'), { code: 'INVALID_SETTINGS' }) }
+    return { value, raw }
+  }
+  let saved = {}
+  try { saved = readSettings(file).value }
+  catch (error) {
+    if (error.code !== 'ENOENT') {
+      if (invalidSettings(error)) {
+        try { settingsWarnings.push(`Файл настроек повреждён и сохранён как ${preserveBrokenFile(file)}.`) }
+        catch { settingsLocked = true; settingsWarnings.push('Не удалось сохранить повреждённый файл настроек. Исходный файл оставлен без изменений.') }
+      } else {
+        settingsLocked = true
+        settingsWarnings.push('Файл настроек не читается. Исходный файл оставлен без изменений.')
+      }
+    }
+    if (!settingsLocked) {
+      try {
+        const backup = readSettings(settingsBackup)
+        saved = backup.value
+        try {
+          atomicWrite(file, backup.raw)
+          settingsWarnings.push('Настройки восстановлены из резервной копии. Последние изменения могли не попасть в копию.')
+        } catch { settingsLocked = true; settingsWarnings.push('Не удалось восстановить файл настроек. Резервная копия сохранена без изменений.') }
+      } catch (backupError) {
+        if (invalidSettings(backupError)) {
+          try { settingsWarnings.push(`Резервная копия настроек также повреждена и сохранена как ${preserveBrokenFile(settingsBackup)}.`) }
+          catch { settingsLocked = true; settingsWarnings.push('Резервная копия настроек не сохранена для восстановления. Запись настроек заблокирована.') }
+        } else if (backupError.code !== 'ENOENT') {
+          settingsLocked = true
+          settingsWarnings.push('Резервная копия настроек не читается и оставлена без изменений.')
+        }
+      }
+    }
+  }
   let apiKey = initial.apiKey || ''
   try { if (saved.encryptedKey) apiKey = safeStorage.decryptString(Buffer.from(saved.encryptedKey, 'base64')) } catch { /* Migration can use the local environment key. */ }
   let settings
-  try { settings = normalize(saved.settings || {}, { ...initial, apiKey }) } catch { settings = normalize({}, { ...initial, apiKey }) }
+  try { settings = normalize(withoutPersonalization({ settings: saved.settings || {} }).settings, { ...initial, apiKey }) } catch { settings = normalize({}, { ...initial, apiKey }) }
+  const retainedSettings = legacyMetadata(saved)
   if (fs.existsSync(practiceLibraryFile)) {
     try {
       if (!safeStorage.isEncryptionAvailable()) throw new Error('Windows encryption is unavailable')
@@ -157,10 +194,16 @@ function createStore(directory, safeStorage, initial, normalize) {
   if (Number(saved.settingsVersion || 0) < 5 && settings.language === 'ru') settings = normalize({ language: 'auto' }, settings)
   const publicConfig = () => { const { apiKey, ...rest } = settings; return { ...rest, hasKey: Boolean(apiKey) } }
   const saveSettings = update => {
+    if (settingsLocked) throw new Error('Настройки не сохранены. Сначала восстанови доступ к исходному файлу настроек или его резервной копии.')
     const next = normalize(withoutPersonalization(update || {}), settings)
     if (next.apiKey && !safeStorage.isEncryptionAvailable()) throw new Error('Windows не может зашифровать ключ. Настройки не сохранены.')
     const { apiKey, ...rest } = next
-    writeJson(file, { settings: rest, encryptedKey: apiKey ? safeStorage.encryptString(apiKey).toString('base64') : saved.encryptedKey || '', settingsVersion: CURRENT_SETTINGS_VERSION })
+    let previous
+    try { previous = readSettings(file) }
+    catch (error) { if (error.code !== 'ENOENT') throw new Error('Файл настроек изменён или не читается. Он оставлен без изменений. Перезапусти программу для восстановления.') }
+    if (previous) atomicWrite(settingsBackup, previous.raw)
+    // Retain opaque legacy fields for recovery; never expose or decrypt them for answers.
+    writeJson(file, { ...retainedSettings, settings: { ...retainedSettings.settings, ...rest }, encryptedKey: apiKey ? safeStorage.encryptString(apiKey).toString('base64') : saved.encryptedKey || '', settingsVersion: CURRENT_SETTINGS_VERSION })
     settings = next
     return publicConfig()
   }
@@ -173,23 +216,28 @@ function createStore(directory, safeStorage, initial, normalize) {
     practiceLibraries = next
     return { ok: true }
   }
-  if ((settings.apiKey || Number(saved.settingsVersion || 0) < CURRENT_SETTINGS_VERSION) && (!settings.apiKey || safeStorage.isEncryptionAvailable())) saveSettings({})
+  if (!settingsLocked && (settings.apiKey || Number(saved.settingsVersion || 0) < CURRENT_SETTINGS_VERSION) && (!settings.apiKey || safeStorage.isEncryptionAvailable())) {
+    try { saveSettings({}) }
+    catch { settingsWarnings.push('Не удалось обновить файл настроек при запуске. Проверь свободное место и доступ к папке. Исходные данные сохранены.') }
+  }
   const loadState = () => {
     if (fs.existsSync(historyFile)) {
       try {
         const state = readHistory(historyFile)
+        retainedHistory = legacyMetadata(state)
         lastSavedHistory = JSON.stringify(state)
         lastBackupAt = Date.now()
-        return state
+        return withoutPersonalization(state)
       } catch {
         const preserved = preserveBrokenFile(historyFile)
         try {
           const recovered = readHistory(historyBackup)
+          retainedHistory = legacyMetadata(recovered)
           atomicWrite(historyFile, JSON.stringify(recovered))
           lastSavedHistory = JSON.stringify(recovered)
           lastBackupAt = Date.now()
           historyWarning = `Файл истории был повреждён. Восстановлена резервная копия, исходный файл сохранён как ${preserved}. Последние изменения могли не попасть в копию.`
-          return recovered
+          return withoutPersonalization(recovered)
         } catch {
           let backupNote = ''
           if (fs.existsSync(historyBackup)) {
@@ -203,11 +251,12 @@ function createStore(directory, safeStorage, initial, normalize) {
     if (fs.existsSync(historyBackup)) {
       try {
         const recovered = readHistory(historyBackup)
+        retainedHistory = legacyMetadata(recovered)
         atomicWrite(historyFile, JSON.stringify(recovered))
         lastSavedHistory = JSON.stringify(recovered)
         lastBackupAt = Date.now()
         historyWarning = 'Основной файл истории отсутствовал. История восстановлена из резервной копии.'
-        return recovered
+        return withoutPersonalization(recovered)
       } catch {
         try { historyWarning = `Основной файл истории отсутствует, а резервная копия повреждена и сохранена как ${preserveBrokenFile(historyBackup)}.` } catch { historyWarning = 'Основной файл истории и резервная копия не читаются.' }
       }
@@ -215,7 +264,7 @@ function createStore(directory, safeStorage, initial, normalize) {
     return null
   }
   const saveState = value => {
-    const serialized = serializeHistory(value)
+    let serialized = serializeHistory({ ...retainedHistory, ...withoutPersonalization(value) })
     if (serialized === lastSavedHistory) return { ok: true, unchanged: true }
     fs.mkdirSync(directory, { recursive: true })
     if (fs.existsSync(historyFile)) {
@@ -225,6 +274,10 @@ function createStore(directory, safeStorage, initial, normalize) {
       } catch {
         const preserved = preserveBrokenFile(historyFile)
         historyWarning = `Перед сохранением повреждённый файл истории сохранён как ${preserved}.`
+      }
+      if (previous) {
+        retainedHistory = legacyMetadata(previous)
+        serialized = serializeHistory({ ...retainedHistory, ...withoutPersonalization(value) })
       }
       if (previous && (!fs.existsSync(historyBackup) || Date.now() - lastBackupAt >= HISTORY_BACKUP_INTERVAL_MS)) {
         atomicWrite(historyBackup, JSON.stringify(previous))
@@ -236,7 +289,7 @@ function createStore(directory, safeStorage, initial, normalize) {
     return { ok: true }
   }
   return {
-    publicConfig, saveSettings, getSettings: () => ({ ...settings }),
+    publicConfig, saveSettings, getSettings: () => ({ ...settings }), settingsWarning: () => settingsWarnings.join(' '),
     getPracticeLibraries: () => JSON.parse(JSON.stringify(practiceLibraries)),
     practiceLibrariesStatus: () => practiceLibrariesLocked ? 'locked' : practiceLibraries.length ? 'ready' : 'empty',
     practiceLibrariesWarning: () => practiceLibrariesWarning,
@@ -244,4 +297,4 @@ function createStore(directory, safeStorage, initial, normalize) {
     loadState, historyWarning: () => historyWarning, saveState,
   }
 }
-module.exports = { createStore, readJson, writeJson, normalizePracticeLibraries, removeLegacyPersonalization }
+module.exports = { createStore, readJson, writeJson, normalizePracticeLibraries }

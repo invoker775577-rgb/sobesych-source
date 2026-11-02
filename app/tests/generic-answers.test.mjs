@@ -68,7 +68,7 @@ test('more detail continues the same scenario after the caller reads the answer,
   }
 })
 
-test('profile migration deletes active and backup resume fields without decrypting them or changing a locked API key', () => {
+test('profile metadata remains recoverable and opaque without changing a locked API key', () => {
   const directory = mkdtempSync(join(tmpdir(), 'sobesych-no-resume-'))
   const backups = `${directory}-backups`
   const backup = join(backups, 'before-update')
@@ -91,10 +91,13 @@ test('profile migration deletes active and backup resume fields without decrypti
     for (const folder of [directory, backup]) {
       const settings = JSON.parse(readFileSync(join(folder, 'settings.json'), 'utf8'))
       assert.equal(settings.encryptedKey, saved.encryptedKey)
-      for (const name of ['settings.json', 'calls.json', 'calls.json.bak']) {
-        assert.doesNotMatch(readFileSync(join(folder, name), 'utf8'), /LOCKED_RESUME|PRIVATE_|encryptedProfiles|candidateProfiles|profileContext|candidateProfile/)
+      assert.equal(settings.encryptedProfiles, saved.encryptedProfiles)
+      assert.equal(settings.candidateProfiles.devops, saved.candidateProfiles.devops)
+      for (const name of ['calls.json', 'calls.json.bak']) {
+        assert.equal(JSON.parse(readFileSync(join(folder, name), 'utf8')).profileContext, legacy.profileContext)
       }
     }
+    assert.doesNotMatch(JSON.stringify(store.publicConfig()), /LOCKED_RESUME|PRIVATE_/)
     store.saveSettings({ candidateProfiles: { devops: 'NEVER_SAVE_THIS' } })
     store.saveState({ calls: state.calls, profileContext: 'NEVER_SAVE_THIS' })
     assert.doesNotMatch(readFileSync(join(directory, 'settings.json'), 'utf8'), /NEVER_SAVE_THIS/)

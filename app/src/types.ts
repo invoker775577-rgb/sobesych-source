@@ -7,16 +7,17 @@ export type PracticeScores = { accuracy: number; directness: number; specificity
 export type PracticeLibrary = { id: string; title: string; createdAt: string; sourceNames: string[]; sourceQuestionCounts: number[]; questions: string[]; questionSources: number[][]; unlabelledFileCount: number; emptyFileCount: number }
 export type Call = { id: string; createdAt: string; duration: number; messages: Message[]; kind?: 'call' | 'practice'; practiceProfile?: 'devops' | 'support'; practiceScores?: PracticeScores; practiceTrackId?: string; practiceTrackStep?: number; practiceQuestionSet?: { title: string; questions: string[] }; practiceReportComplete?: boolean; usage?: UsageRecord[]; usageTracking?: 'complete' | 'partial'; transcriptionMode?: 'local' | 'openrouter' }
 export type SavedState = { calls: Call[] }
-export type Settings = { hasKey: boolean; baseUrl: string; model: string; language: string; microphoneId: string; practiceProfile: 'devops' | 'support'; autoAnswer: boolean; transcriptionMode: 'local' | 'openrouter'; transcriptionBaseUrl: string; transcriptionModel: string }
+export type ContextDocument = { id: string; title: string; text: string }
+export type Settings = { hasKey: boolean; baseUrl: string; model: string; codeModel: string; designModel: string; contextIds: string[]; language: string; microphoneId: string; practiceProfile: 'devops' | 'support'; autoAnswer: boolean; transcriptionMode: 'local' | 'openrouter'; transcriptionBaseUrl: string; transcriptionModel: string }
 export type LocalSpeech = { running: boolean; backend: 'cpu' | 'cuda' | null; cudaInstalled: boolean; gpuSupported: boolean }
-export type Model = { id: string; name: string; pricing?: { prompt: string; completion: string }; modalities?: string[] }
+export type Model = { id: string; name: string; pricing?: { prompt: string; completion: string }; modalities?: string[]; context_length?: number }
 type Result = { error?: string; ok?: boolean }
 type UsageResult = { model?: string; usage?: Record<string, unknown> }
 export type UpdateState = { phase: 'disabled' | 'idle' | 'checking' | 'available' | 'downloading' | 'downloaded' | 'installing' | 'error'; currentVersion: string; version?: string; percent?: number; error?: string; releasePage?: string; checked?: boolean }
 declare global {
   interface Window {
     sobesych?: {
-      getConfig(): Promise<Result & { settings: Settings; state: SavedState | null; practiceLibraries: PracticeLibrary[]; practiceLibrariesStatus: 'empty' | 'ready' | 'locked'; practiceLibrariesWarning?: string; historyWarning?: string; captureProtected?: boolean; overlayMode?: boolean; localSpeech?: LocalSpeech; practiceOnly: boolean; version: string }>
+      getConfig(): Promise<Result & { settings: Settings; state: SavedState | null; settingsWarning?: string; contextDocuments?: ContextDocument[]; contextStatus?: { locked: boolean; warning: string }; practiceLibraries: PracticeLibrary[]; practiceLibrariesStatus: 'empty' | 'ready' | 'locked'; practiceLibrariesWarning?: string; historyWarning?: string; captureProtected?: boolean; overlayMode?: boolean; localSpeech?: LocalSpeech; practiceOnly: boolean; version: string }>
       getUpdateState(): Promise<UpdateState>
       checkUpdate(): Promise<UpdateState>
       downloadUpdate(): Promise<UpdateState>
@@ -27,7 +28,9 @@ declare global {
       saveState(value: SavedState): Promise<Result>
       traceAnswer(value: { requestId: string; stage: string; reason?: string; elapsedMs: number }): Promise<Result>
       savePracticeLibraries(value: PracticeLibrary[]): Promise<Result>
-      assist(value: { requestId: string; mode: string; messages: Message[]; focus?: string; screenshot?: string; screenLanguage?: 'ru' | 'en'; partialQuestion?: boolean; maxTokens?: number; singleAttempt?: boolean }): Promise<Result & { answer?: string } & UsageResult>
+      saveContextDocuments(value: ContextDocument[]): Promise<Result & { documents?: ContextDocument[] }>
+      exportDiagram(source: string): Promise<Result>
+      assist(value: { requestId: string; mode: string; messages: Message[]; presentation?: 'layered'; focus?: string; screenshot?: string; screenLanguage?: 'ru' | 'en'; partialQuestion?: boolean; maxTokens?: number; singleAttempt?: boolean }): Promise<Result & { answer?: string; usedContextIds?: string[]; answerKind?: string } & UsageResult>
       onAnswerDelta(callback: (event: { requestId: string; text: string }) => void): () => void
       transcribe(value: { audio: string; localOnly?: boolean; provisional?: boolean; source?: 'me' | 'interviewer'; requestId?: string; language?: 'auto' | 'ru' | 'en' }): Promise<Result & { text?: string } & UsageResult & { text?: string }>
       warmLocalTranscription(): Promise<Result & { previewEnabled?: boolean; backend?: 'cpu' | 'cuda' }>

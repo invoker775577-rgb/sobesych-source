@@ -4,11 +4,13 @@ import { fileURLToPath } from 'node:url'
 import { latestInterviewerMessage, localSocialReply, isCodeRequest, isCodeChangeRequest, isProseChangeRequest, isDiagnosticQuestion, isExperienceQuestion, isPersonalStoryQuestion, isLikelyInterviewQuestion, isTranscriptNoise, normalizeTranscriptText, normalizeMessageText } from './src/transcript.mjs'
 import { lookupDomainKnowledge } from './src/domain-knowledge.mjs'
 import { visiblePracticeReport } from './src/practice-score.mjs'
+import { activeTask, copilotRequest } from './src/copilot.mjs'
 
 export const defaults = {
   baseUrl: 'https://openrouter.ai/api/v1', model: 'qwen/qwen3.7-flash',
   transcriptionBaseUrl: 'https://openrouter.ai/api/v1', transcriptionModel: 'openai/whisper-large-v3-turbo',
   transcriptionMode: 'local', language: 'auto', microphoneId: 'default', practiceProfile: 'devops', autoAnswer: false,
+  codeModel: '', designModel: '', contextIds: [],
 }
 export function textOr(value, fallback = '') {
   return typeof value === 'string' && value.trim() ? value.trim() : fallback
@@ -25,6 +27,8 @@ export function resolveSettings(input = {}, fallback = {}) {
   const result = { ...defaults }
   for (const key of ['apiKey', ...Object.keys(defaults).filter(k => k !== 'autoAnswer')]) result[key] = textOr(input[key], textOr(fallback[key], defaults[key] || ''))
   result.autoAnswer = typeof input.autoAnswer === 'boolean' ? input.autoAnswer : fallback.autoAnswer ?? defaults.autoAnswer
+  for (const key of ['codeModel', 'designModel']) result[key] = typeof input[key] === 'string' ? input[key].trim().slice(0, 160) : typeof fallback[key] === 'string' ? fallback[key] : ''
+  result.contextIds = [...new Set((Array.isArray(input.contextIds) ? input.contextIds : Array.isArray(fallback.contextIds) ? fallback.contextIds : []).filter(id => typeof id === 'string' && /^[\w-]{1,80}$/.test(id)))].slice(0, 8)
   if (!['local', 'openrouter'].includes(result.transcriptionMode)) result.transcriptionMode = 'local'
   if (!['devops', 'support'].includes(result.practiceProfile)) result.practiceProfile = 'devops'
   for (const key of ['baseUrl', 'transcriptionBaseUrl']) {
@@ -154,6 +158,16 @@ export function localAnswer(input) {
   const lines = promptLines(input)
   const latest = latestInterviewerMessage(lines)
   const text = latest?.text?.trim() || ''
+  if (input.presentation === 'layered') {
+    const task = activeTask(lines)
+    const unresolved = task.kind === 'code' ? unclearNumericIdentifiers(task.turns) : []
+    if (unresolved.length) {
+      const values = unresolved.slice(0, 3).map(({ field, heard }) => `${field} = ${JSON.stringify(heard)}`).join(', ')
+      return isEnglishQuestion(input)
+        ? `:::kind code\n:::answer\nI need the exact ID before writing the query. The transcript says ${values}.\n:::questions\nWhat is the exact value?`
+        : `:::kind code\n:::answer\nНужно точное значение ID для запроса. В распознавании получилось ${values}.\n:::questions\nКакое значение должно быть?`
+    }
+  }
   if (/\bfireball\b/i.test(text) && /\bwhat\b|\bexplain\b|\btell me\b|что такое|ч[оеё]\s+такое|расскаж|объясни/iu.test(text)) {
     return isEnglishQuestion(input)
       ? 'Do you mean a firewall, or a specific tool called Fireball?'
@@ -187,13 +201,25 @@ export function localAnswer(input) {
 export function isEnglishQuestion(input) {
   const lines = promptLines(input)
   const question = input.screenshot && (input.mode || 'answer') === 'answer' ? lines.findLast(line => line.speaker === 'interviewer') : latestInterviewerMessage(lines)
-  let text = (question?.text || '').replace(/```[\s\S]*?(?:```|$)|`[^`\r\n]*(?:`|$)/gu, ' ')
-  const leadingLine = text.trimStart().split(/\r?\n/u)[0]
-  if (question?.origin === 'manual' && /\r?\n/u.test(text) && isLikelyInterviewQuestion(leadingLine)) text = leadingLine
-  const latin = (text.match(/[a-z]/gi) || []).length
-  const cyrillic = (text.match(/[а-яё]/gi) || []).length
-  if (!cyrillic && /^(?:why|how|what|which|when|where|who|yes|no|but|without|only)(?=$|[^a-z])/i.test(text.trim())) return true
-  return latin >= 8 && (cyrillic <= 2 || latin > cyrillic * 4)
+  const language = turn => {
+    let text = (turn?.text || '').replace(/```[\s\S]*?(?:```|$)|`[^`\r\n]*(?:`|$)/gu, ' ')
+    const leadingLine = text.trimStart().split(/\r?\n/u)[0]
+    if (turn?.origin === 'manual' && /\r?\n/u.test(text) && isLikelyInterviewQuestion(leadingLine)) text = leadingLine
+    const latin = (text.match(/[a-z]/gi) || []).length
+    const cyrillic = (text.match(/[а-яё]/gi) || []).length
+    if (!cyrillic && /^(?:(?:and|so|then|please)\s+)?(?:why|how|what|which|when|where|who|yes|no|but|without|only|more|details|explain|elaborate|go\s+on)(?=$|[^a-z])/i.test(text.trim())) return true
+    if (latin >= 8 && (cyrillic <= 2 || latin > cyrillic * 4)) return true
+    return cyrillic ? false : null
+  }
+  const current = language(question)
+  if (current !== null) return current
+  // A short technical name or number has no language of its own.
+  for (let index = lines.findLastIndex(line => line.speaker === 'interviewer') - 1; index >= 0; index--) {
+    if (lines[index].speaker !== 'interviewer' || isTranscriptNoise(lines[index].text)) continue
+    const previous = language(lines[index])
+    if (previous !== null) return previous
+  }
+  return false
 }
 function isContextualFollowup(text = '') {
   if (isDetailRequest(text)) return true
@@ -206,6 +232,7 @@ function isContextualFollowup(text = '') {
   return /^(?:а\s+(?:если|что|как|почему|зачем|где|с\s+чем|в\s+ч[её]м|насколько)|и\s+(?:если|что|как|почему|зачем)|тогда(?=$|[^\p{L}])|как\s+насч[её]т(?=$|[^\p{L}])|что\s+насч[её]т(?=$|[^\p{L}])|and\s+(?:if|what|how|why)\b|so\s+(?:what|how|if)\b|then\b|what\s+about\b|how\s+about\b|what\s+if\b|in\s+that\s+case\b|why\s*[?!.]*$|how\s+so\b)/iu.test(text.trim())
 }
 function isDetailRequest(text = '') {
+  if (/^(?:(?:and|so|please)\s+)?(?:more|details|go\s+on)\s*[?!.]*$/iu.test(text.trim())) return true
   return /^(?:(?:а|и|ну|and|so|please)\s+)?(?:(?:расскажи(?:те)?|объясни(?:те)?)\s+)?(?:поподробнее|подробнее|more\s+details?|tell\s+me\s+more|(?:can|could)\s+you\s+(?:elaborate|give\s+more\s+details?)|elaborate)(?=$|[^\p{L}\p{N}_])/iu.test(text.trim())
 }
 function previousCodeContext(lines, latest) {
@@ -260,12 +287,13 @@ function previousSpokenDraft(lines, latest) {
 function requestsCodeAnswer(lines, latest = latestInterviewerMessage(lines)) {
   return Boolean(latest && (isCodeRequest(latest.text) || previousCodeContext(lines, latest)))
 }
-function unclearNumericIdentifierRule(lines) {
+function unclearNumericIdentifiers(lines) {
   const unresolved = new Map()
   const pattern = /\b(id|[a-z_][a-z\d_]*id)\s*(?:=\s*|(?:is|это(?:\s+число)?)\s+|\s+)(\d+(?:\.\d+){2,}|[+-]?\d+(?:\.\d+)?)(?!\d|\.\d)/giu
   const quotedValue = /\b(id|[a-z_][a-z\d_]*id)\s*(?:=\s*|(?:is|это)\s+|\s+)(?:'(?:''|[^'])*'|"(?:\\.|[^"\\])*"|`[^`\r\n]*`)/giu
   for (const line of lines) {
     if (!['interviewer', 'me'].includes(line.speaker)) continue
+    if (unresolved.size === 1 && line.origin === 'manual' && /^[+-]?\d+(?:\.\d+)?[.!]?$/u.test(line.text.trim())) unresolved.clear()
     // Explicit code and quoted values are task data, not ASR number fragments.
     for (const [, field] of line.text.matchAll(quotedValue)) unresolved.delete(field.toLowerCase())
     if (line.text.includes('`')) for (const [, field, value] of line.text.matchAll(pattern)) {
@@ -278,8 +306,12 @@ function unclearNumericIdentifierRule(lines) {
       else unresolved.delete(key)
     }
   }
-  if (!unresolved.size) return ''
-  return `CRITICAL unresolved numeric identifiers from speech: ${JSON.stringify([...unresolved.values()])}. These heard fragments are NOT verified SQL literal values. They cannot be used as bare numbers, strings, integer guesses or IN lists. Return a query TEMPLATE using the named parameters above for these fields. Preserve all other confirmed conditions. In at most two short sentences, call it a template, quote the unclear heard fragment and ask for that field's exact value. Never claim this is a fully resolved runnable answer until the identifier is confirmed.`
+  return [...unresolved.values()]
+}
+function unclearNumericIdentifierRule(lines) {
+  const unresolved = unclearNumericIdentifiers(lines)
+  if (!unresolved.length) return ''
+  return `CRITICAL unresolved numeric identifiers from speech: ${JSON.stringify(unresolved)}. These heard fragments are NOT verified SQL literal values. They cannot be used as bare numbers, strings, integer guesses or IN lists. Return a query TEMPLATE using the named parameters above for these fields. Preserve all other confirmed conditions. In at most two short sentences, call it a template, quote the unclear heard fragment and ask for that field's exact value. Never claim this is a fully resolved runnable answer until the identifier is confirmed.`
 }
 function combineProviderUsage(attempts) {
   const reports = attempts.filter(value => value && typeof value === 'object')
@@ -509,7 +541,7 @@ const questionFocusRule = 'When a turn contains conversational asides before a s
 const exampleRule = 'For a work case or personal question, give a useful sample answer instead of rejecting it for missing biography. Start invented scenarios with "Пример кейса." or "Example scenario." and use conditional actions, not claims that the candidate really did them. Do not invent employers or personal measurements. When asked for more detail, continue the same scenario and keep its assumptions unless correcting a technical error.'
 const tokenLimits = { answer: 450, code: 1800, expand: 450, clarify: 320, 'practice-next': 120, review: 850, 'practice-report': 1100, summary: 620, screen: 1800, 'extract-task': 1200 }
 
-export function createService({ getSettings = () => resolveSettings({}, { apiKey: process.env.OPENAI_API_KEY, baseUrl: process.env.OPENAI_BASE_URL, model: process.env.OPENAI_MODEL }), fetchImpl = fetch } = {}) {
+export function createService({ getSettings = () => resolveSettings({}, { apiKey: process.env.OPENAI_API_KEY, baseUrl: process.env.OPENAI_BASE_URL, model: process.env.OPENAI_MODEL }), getContextDocuments = () => [], fetchImpl = fetch } = {}) {
   let visionCatalog = null
   let visionCatalogAt = 0
   let visionCatalogUrl = ''
@@ -536,6 +568,8 @@ export function createService({ getSettings = () => resolveSettings({}, { apiKey
     if (onDelta && response.headers.get('content-type')?.includes('text/event-stream')) {
       let pending = ''; let answer = ''; let usage; let resolvedModel; let finishReason; let completed = false; let lastUpdate = -Infinity
       const decoder = new TextDecoder()
+      const reader = response.body.getReader()
+      let ended = false
       const processLine = line => {
         if (!line.startsWith('data:')) return
         const raw = line.slice(5).trim()
@@ -556,13 +590,17 @@ export function createService({ getSettings = () => resolveSettings({}, { apiKey
         }
       }
       try {
-        for await (const chunk of response.body) {
-          pending += decoder.decode(chunk, { stream: true })
+        while (!completed) {
+          const { value, done } = await reader.read()
+          if (done) { ended = true; break }
+          pending += decoder.decode(value, { stream: true })
           let newline
-          while ((newline = pending.indexOf('\n')) !== -1) { processLine(pending.slice(0, newline).replace(/\r$/, '')); pending = pending.slice(newline + 1) }
+          while (!completed && (newline = pending.indexOf('\n')) !== -1) { processLine(pending.slice(0, newline).replace(/\r$/, '')); pending = pending.slice(newline + 1) }
         }
-        pending += decoder.decode()
-        if (pending.trim()) processLine(pending.replace(/\r$/, ''))
+        if (!completed) {
+          pending += decoder.decode()
+          if (pending.trim()) processLine(pending.replace(/\r$/, ''))
+        }
         if (finishReason === 'length' || (!completed && !finishReason)) {
           throw new Error(finishReason === 'length'
             ? 'Ответ не завершён: модель достигла лимита длины. Увеличь лимит или попроси продолжить.'
@@ -573,7 +611,12 @@ export function createService({ getSettings = () => resolveSettings({}, { apiKey
         error.model ??= resolvedModel
         error.usage ??= usage
         error.partialAnswer ??= answer
+        if (answer.trim() && !signal?.aborted) onDelta(answer)
         throw error
+      } finally {
+        // Do not wait for a keep-alive connection or a provider's cancellation acknowledgement.
+        if (!ended) void reader.cancel().catch(() => {})
+        reader.releaseLock()
       }
       return { choices: [{ message: { content: answer } }], usage, model: resolvedModel }
     }
@@ -600,10 +643,17 @@ export function createService({ getSettings = () => resolveSettings({}, { apiKey
       const ollama = ['localhost', '127.0.0.1'].includes(url.hostname) && url.port === '11434'
       if (!ollama && !config.apiKey) throw new Error('Ключ не сохранён. Открой настройки и сохрани ключ OpenRouter.')
       const screenFollowup = (input.mode || 'answer') === 'answer' && Boolean(input.screenshot)
+      const enhanced = input.presentation === 'layered' && ['answer', 'screen', 'clarify', 'expand'].includes(input.mode || 'answer')
+        ? copilotRequest({ ...input, contextIds: config.contextIds }, input.mode === 'screen' && ['ru', 'en'].includes(input.screenLanguage) ? input.screenLanguage === 'en' : isEnglishQuestion(input), getContextDocuments()) : null
+      const profileModel = enhanced?.kind === 'design' ? config.designModel || config.model : ['code', 'screen'].includes(enhanced?.kind) ? config.codeModel || config.model : config.model
       const visionMode = ['screen', 'extract-task'].includes(input.mode) || screenFollowup
-      const visionModels = visionMode && !ollama ? await getVisionModels(config, signal) : []
-      const model = visionModels[0] || config.model
-      const prompt = buildPrompt(input)
+      const visionModels = visionMode && !ollama ? await getVisionModels({ ...config, model: profileModel }, signal) : []
+      const model = visionModels[0] || profileModel
+      const screenRules = enhanced && input.mode === 'screen' ? `${screenSystemPrompt}${screenLanguageRule(input)}`
+        : enhanced && screenFollowup ? screenFollowupSystemPrompt : ''
+      const screenUserRules = enhanced && input.mode === 'screen' ? buildPrompt(input)
+        : enhanced && screenFollowup ? `Answer in ${isEnglishQuestion(input) ? 'English, using short sentences and simple words' : 'Russian, using plain spoken words'}.` : ''
+      const prompt = enhanced ? `${screenUserRules ? `${screenUserRules}\n\n` : ''}${enhanced.context}` : buildPrompt(input)
       if (visionMode && !/^data:image\/(png|jpeg);base64,[A-Za-z0-9+/=]+$/.test(input.screenshot || '')) throw new Error('Снимок экрана не получен')
       const content = input.screenshot ? [{ type: 'text', text: prompt }, { type: 'image_url', image_url: { url: input.screenshot } }] : prompt
       const openRouter = config.baseUrl.includes('openrouter.ai')
@@ -623,8 +673,8 @@ export function createService({ getSettings = () => resolveSettings({}, { apiKey
       const english = isEnglishQuestion(input)
       const spokenSystem = `${questionClarityRule} ${questionFocusRule} ${english ? `${englishSystemPrompt} ${englishAccuracyRule}` : `${systemPrompt} ${accuracyRule}`} ${spokenLanguageRule} ${exampleRule}`
       const codeContext = codeAnswer ? previousCodeContext(lines, latestQuestion) : null
-      const numericIdentifierRule = codeAnswer ? unclearNumericIdentifierRule(codeContext?.turns || conversationContext(lines, mode, latestQuestion, 12_000)) : ''
-      const defaultMaxTokens = screenFollowup ? tokenLimits.screen : codeAnswer ? tokenLimits.code : caseAnswer ? english ? 320 : 600 : mode === 'answer' ? english ? 240 : 430 : tokenLimits[mode] || tokenLimits.answer
+      const numericIdentifierRule = enhanced && ['code', 'screen'].includes(enhanced.kind) ? unclearNumericIdentifierRule(enhanced.turns) : codeAnswer ? unclearNumericIdentifierRule(codeContext?.turns || conversationContext(lines, mode, latestQuestion, 12_000)) : ''
+      const defaultMaxTokens = enhanced?.maxTokens || (screenFollowup ? tokenLimits.screen : codeAnswer ? tokenLimits.code : caseAnswer ? english ? 320 : 600 : mode === 'answer' ? english ? 240 : 430 : tokenLimits[mode] || tokenLimits.answer)
       const requestedMaxTokens = Number.isSafeInteger(input.maxTokens) ? Math.max(64, input.maxTokens) : defaultMaxTokens
       const maxTokens = Math.min(defaultMaxTokens, requestedMaxTokens)
       // Model-specific options must be rebuilt on retry, not inherited from the first model.
@@ -632,7 +682,7 @@ export function createService({ getSettings = () => resolveSettings({}, { apiKey
         model: targetModel, temperature: visionMode ? 0.1 : 0.2, max_tokens: maxTokens,
         ...(openRouter && targetModel === 'qwen/qwen3.7-flash' ? { reasoning: { enabled: false } } : {}),
         ...(ollama ? { stream: false } : streamEnabled ? { stream: true, stream_options: { include_usage: true } } : {}),
-      messages: [{ role: 'system', content: input.mode === 'extract-task' ? extractTaskPrompt : input.mode === 'screen' ? screenSystemPrompt + screenLanguageRule(input) : screenFollowup ? screenFollowupSystemPrompt : input.mode === 'practice-next' ? english ? englishPracticeInterviewerSystemPrompt : practiceInterviewerSystemPrompt : input.mode === 'practice-report' ? english ? englishPracticeReportSystemPrompt : practiceReportSystemPrompt : input.mode === 'review' ? english ? englishReviewSystemPrompt : reviewSystemPrompt : codeAnswer ? `${codeSystemPrompt} ${numericIdentifierRule} ${english ? 'Explain ONLY in simple A1-A2 English.' : 'Объясняй только по-русски простыми словами.'}` : spokenSystem }, { role: 'user', content }],
+      messages: [{ role: 'system', content: enhanced ? `${enhanced.system}\n${questionClarityRule} ${questionFocusRule} ${spokenLanguageRule} ${english ? englishAccuracyRule : accuracyRule} ${numericIdentifierRule}${screenRules ? `\nScreen-specific content rules override ordinary prose limits; keep the section markers.\n${screenRules}` : ''}` : (input.mode === 'extract-task' ? extractTaskPrompt : input.mode === 'screen' ? screenSystemPrompt + screenLanguageRule(input) : screenFollowup ? screenFollowupSystemPrompt : input.mode === 'practice-next' ? english ? englishPracticeInterviewerSystemPrompt : practiceInterviewerSystemPrompt : input.mode === 'practice-report' ? english ? englishPracticeReportSystemPrompt : practiceReportSystemPrompt : input.mode === 'review' ? english ? englishReviewSystemPrompt : reviewSystemPrompt : codeAnswer ? `${codeSystemPrompt} ${numericIdentifierRule} ${english ? 'Explain ONLY in simple A1-A2 English.' : 'Объясняй только по-русски простыми словами.'}` : spokenSystem) }, { role: 'user', content }],
       })
       const clean = cleanSpokenAnswer
       const streamAnswer = streamEnabled ? partial => onDelta(input.mode === 'practice-report' ? visiblePracticeReport(partial) : clean(partial)) : undefined
@@ -686,7 +736,7 @@ export function createService({ getSettings = () => resolveSettings({}, { apiKey
         throw error
       }
       if (retried) streamAnswer?.(answer)
-      return { answer, model: data.model || effectiveModel, usage }
+      return { answer, model: data.model || effectiveModel, usage, ...(enhanced ? { answerKind: enhanced.kind, usedContextIds: enhanced.usedContextIds } : {}) }
     },
     async transcribe(input, signal) {
       const config = getSettings()
@@ -698,7 +748,7 @@ export function createService({ getSettings = () => resolveSettings({}, { apiKey
     },
     async models(_input, signal) {
       const data = await request('https://openrouter.ai/api/v1/models', null, null, signal)
-      return { models: (data.data || []).map(m => ({ id: m.id, name: m.name, pricing: m.pricing, modalities: m.architecture?.input_modalities || [] })) }
+      return { models: (data.data || []).map(m => ({ id: m.id, name: m.name, pricing: m.pricing, context_length: m.context_length, modalities: m.architecture?.input_modalities || [] })) }
     },
   }
 }

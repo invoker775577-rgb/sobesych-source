@@ -14,6 +14,8 @@ contextBridge.exposeInMainWorld('sobesych', {
   saveSettings: value => ipcRenderer.invoke('settings:save', value),
   saveState: value => ipcRenderer.invoke('state:save', value),
   savePracticeLibraries: value => ipcRenderer.invoke('practice-libraries:save', value),
+  saveContextDocuments: value => ipcRenderer.invoke('context:save', value),
+  exportDiagram: source => ipcRenderer.invoke('diagram:export', source),
   setCaptureProtection: enabled => ipcRenderer.invoke('privacy:set', enabled),
   assist: value => ipcRenderer.invoke('provider:assist', value),
   traceAnswer: value => ipcRenderer.invoke('answer:trace', value),

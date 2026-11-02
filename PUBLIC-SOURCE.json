@@ -1,5 +1,5 @@
 {
-  "applicationVersion": "0.5.84",
+  "applicationVersion": "0.5.85",
   "includesUnreleasedFixes": false,
   "hashNormalization": "UTF-8 text CRLF to LF; binary files unchanged",
   "exportPolicy": "Application source and synthetic tests only; no private Git history, profiles, recordings or evidence",
@@ -18,7 +18,7 @@
     },
     {
       "path": "app/.oxlintrc.json",
-      "sha256": "b4d344818a1e1bf43997e4744a9153c8eef770c98b58229cd86363dabb85ded4"
+      "sha256": "786258a3a8baa1919ee9b9d0cc121487c13f2f34336301bab925e00fd82ae450"
     },
     {
       "path": "app/build/installer-preflight.nsh",
@@ -26,11 +26,11 @@
     },
     {
       "path": "app/electron-builder.practice.yml",
-      "sha256": "76903460c31716a11cea91461bea2a117d7f7cdfb3730f70bf7fae7268b58643"
+      "sha256": "577453eb4baa9f3b74e9566654c543fd1e61ab13406f9249b1e9d3b77ac012b3"
     },
     {
       "path": "app/electron-builder.windows.yml",
-      "sha256": "1960deee8237fecdcab8f7810005adcc1ebb067ce1206ff90878b74c21bafe0b"
+      "sha256": "f69b9600eacea295f88f51ada52abce7fe6425930cfe4669f4760b3b49c90bd4"
     },
     {
       "path": "app/electron/answer-trace.cjs",
@@ -41,16 +41,40 @@
       "sha256": "fbc4efdde8bb8b3e2c14aa09e76d56f445338073aa3a1daeb1d9a9b631411334"
     },
     {
+      "path": "app/electron/context-store.cjs",
+      "sha256": "f9d6ccacd2161abbfdd7c9f486c53dde56c49b88211d95e3e7d8c2ef9543c2eb"
+    },
+    {
+      "path": "app/electron/licenses/CPYTHON.txt",
+      "sha256": "b0e25a78cffb43f4d92de8b61ccfa1f1f98ecbc22330b54b5251e7b6ba010231"
+    },
+    {
+      "path": "app/electron/licenses/FFLATE.txt",
+      "sha256": "0a1df3a083d0c010560aa342e87959c8c1070e6fd54545741f083f22d0c8b551"
+    },
+    {
+      "path": "app/electron/licenses/PDFJS.txt",
+      "sha256": "0d542e0c8804e39aa7f37eb00da5a762149dc682d7829451287e11b938e94594"
+    },
+    {
+      "path": "app/electron/licenses/PYODIDE-MPL-2.0.txt",
+      "sha256": "1f256ecad192880510e84ad60474eab7589218784b9a50bc7ceee34c2b91f1d5"
+    },
+    {
+      "path": "app/electron/licenses/SQLJS.txt",
+      "sha256": "60a3f6e4d7b29b4321359e683b36cf198d24f58e24582070f56e6fa89d5ee2be"
+    },
+    {
       "path": "app/electron/local-stt.cjs",
       "sha256": "5f3e98249ab2d13a1ee5d2b2a591c3724eb716732a1aad663725f1695fcf6a7b"
     },
     {
       "path": "app/electron/main.cjs",
-      "sha256": "78f6f6b062b9f3b5289af3b4e7977400fecb7b25925ba5d4d15e99c86fe7de33"
+      "sha256": "f0ed99f746cf1f0919e03844a8caa973087bb4c187595671d6253ca2d8960888"
     },
     {
       "path": "app/electron/preload.cjs",
-      "sha256": "aa22ed2b0eb20537a5745345527ac8052292a9465fb4167c258b92625a0ee6a4"
+      "sha256": "b12db6622dd20840464381f830da3a41a78c86431752be1621204725e76f66f9"
     },
     {
       "path": "app/electron/region-preload.cjs",
@@ -78,11 +102,11 @@
     },
     {
       "path": "app/electron/store.cjs",
-      "sha256": "3a7d87a1218d96c6885da4a497cbdb7980a40b7196961d37556bdee77ec65d5a"
+      "sha256": "d5d023330a3cba9a95dc60119c304e87fb1b5ea9d25903cde8ce12585c929f12"
     },
     {
       "path": "app/electron/third-party-notices.txt",
-      "sha256": "4067f18c48732e067ba3fc34252472361a6e61ddb157a630484b1f4649534529"
+      "sha256": "e705e916748fe164ac435cb48cb791b983d799af8cff15615271db96fe96b3b1"
     },
     {
       "path": "app/electron/updates.cjs",
@@ -98,11 +122,11 @@
     },
     {
       "path": "app/package-lock.json",
-      "sha256": "b64bfcb536b9e67cbd7ae7709d42d9ed73084f3c5aa2f8634601c79f3a3416ad"
+      "sha256": "0400954b6d47613874b1b6e09405aeaeb67adb251608ae9bdd1e7e4f8d9ff084"
     },
     {
       "path": "app/package.json",
-      "sha256": "119320061f9204a365a582745a6d5f326382f6f3be74083ac5a781910aa90ccc"
+      "sha256": "5a75f1d53b650b6c98dcef1b32131a836954a03516a00a5f679644a624f5aa38"
     },
     {
       "path": "app/public/favicon.svg",
@@ -125,24 +149,28 @@
       "sha256": "4f64a2ef315651b31e604fdc61726567d7e0648296b0065fcc0dae3fbb2104d8"
     },
     {
+      "path": "app/scripts/prepare-code-runtimes.mjs",
+      "sha256": "7feaa6560a3c07aac05fc4efe9b4e47598405d6e9799159ef99c3e1f531b0433"
+    },
+    {
       "path": "app/scripts/source-bytes.mjs",
       "sha256": "cbb13fd2d317983f5add01d6ddf77f6ce05f6f4b551666707e55e87beb7ecf43"
     },
     {
       "path": "app/scripts/verify-release.mjs",
-      "sha256": "864426546e6aed50e69123afa096a3d5963a56a3d7e33ca27e4dc7e4db3fa3e8"
+      "sha256": "bcc4d83f1884338136aa3865919fb34586d925f78a1b78e3e1268f4217c7555c"
     },
     {
       "path": "app/server.mjs",
-      "sha256": "9b0891e12620d5cf2099a1ed0f0c8eba0fd23c583f4dacbdd6e271b00063b3f0"
+      "sha256": "4f769b3cc8a163c4f9d3dd4903b7c24d37dcc01e6405d6c76269ade267eac6bc"
     },
     {
       "path": "app/src/App.css",
-      "sha256": "267713523baffc9c26ba191dfdcfe0c588f1fe20824783427fae111e55dabae9"
+      "sha256": "b6898614b16736506ed82a752fc69723cc947e0f6a8938e069554eeb2c543a57"
     },
     {
       "path": "app/src/App.tsx",
-      "sha256": "fdd67fbcb8c9e408d1cec7d0a9b8b183cbf454da1f2608d06ded15b26c8cd3e8"
+      "sha256": "67f6d660d0901482fb98d471448ea0957685c1af5655a5429fe0b4cf65457516"
     },
     {
       "path": "app/src/assets/hero.png",
@@ -169,6 +197,30 @@
       "sha256": "cfae411601ceb48c9e292d1506b7d974a4229128db4ddc057765419c9c7b3aed"
     },
     {
+      "path": "app/src/code-sandbox.ts",
+      "sha256": "c4bbd9fc582d323633f9e237def051126080dfb0d0aa01ae009dc9521cd03586"
+    },
+    {
+      "path": "app/src/ContextPanel.tsx",
+      "sha256": "bbd5b4b99b1096f9df19b206bf4df7b69e28f72d933dd04f6012527706601e78"
+    },
+    {
+      "path": "app/src/copilot.d.mts",
+      "sha256": "f081046ac4041e303c5290409c03c320cd73bbf30d941f2fc66b6992b5c2ca3a"
+    },
+    {
+      "path": "app/src/copilot.mjs",
+      "sha256": "f3a9c8e833a19f148fbfea776ac5f09159d0c3511d6979784fb45bccdbd987f0"
+    },
+    {
+      "path": "app/src/diagram.d.mts",
+      "sha256": "09fa351dc2c50f1c3ecbfe0c73cb449234e601d11a1764e82fea6a43568e7733"
+    },
+    {
+      "path": "app/src/diagram.mjs",
+      "sha256": "d1e97b09076c53cd02a393ed635e635d1cf12349ecfcba3228be04f9181289f0"
+    },
+    {
       "path": "app/src/domain-knowledge.mjs",
       "sha256": "6c2cd37c56a934ee9ba840f0313c4807e26fdcadcd1a5a7779f3ba850b6b1490"
     },
@@ -179,6 +231,10 @@
     {
       "path": "app/src/main.tsx",
       "sha256": "263cce727b557ff508c3abd18feb8ba1705d8414524b4a312347fb705ac7070c"
+    },
+    {
+      "path": "app/src/ModelProfiles.tsx",
+      "sha256": "647a7a95db5274c73750ef0c9be70937feccce5f591ab36185ed3570108e95f6"
     },
     {
       "path": "app/src/pcm-worklet.js",
@@ -217,6 +273,10 @@
       "sha256": "5bbba62ce6cb1c65a96ee285bd1c37f453e3ff145bb75b1a8c6ff206b01a2fb6"
     },
     {
+      "path": "app/src/read-context-file.ts",
+      "sha256": "fcc70379553243912265edb1a666acbf9e2c70573d06699a92481cf916317b9e"
+    },
+    {
       "path": "app/src/screen-task.d.mts",
       "sha256": "34be4d59aea3c637895b3cccf35b8d9ff9389b735be804bd01fc749becebe818"
     },
@@ -233,6 +293,10 @@
       "sha256": "e7a0518f4d3facd2d62d9ccb108ec5b148555f92d44d61350dea7f56f95fe582"
     },
     {
+      "path": "app/src/TechnicalAnswer.tsx",
+      "sha256": "478663b5ca76a95fc1ac020221e28ed78a3d61a2aca4efd2b52bae11af223b5c"
+    },
+    {
       "path": "app/src/transcript.d.mts",
       "sha256": "d647ab1d28d24f2dea66d8b66538f94550c77ccccb61d406fd48b5a26de27766"
     },
@@ -242,7 +306,7 @@
     },
     {
       "path": "app/src/types.ts",
-      "sha256": "04e289ff318343f3adac8e7197e9a1637dc0ebf1ddda212c615ccfea08f23e0c"
+      "sha256": "af3e55b79290c7c0c0c4cb64b19f2e84d22611c3eaa7cc3001d9f4f6f5111ad7"
     },
     {
       "path": "app/src/UpdatePanel.tsx",
@@ -277,8 +341,12 @@
       "sha256": "32b0137a10568cfe3c6f48d59a05468b498e503be82e48c5c0372d493a795889"
     },
     {
+      "path": "app/tests/copilot.test.mjs",
+      "sha256": "9a4b4412ac309bc3686add0f5e20394c0a040237fac2434ae345c5da6c99cf5a"
+    },
+    {
       "path": "app/tests/generic-answers.test.mjs",
-      "sha256": "04c3f71f3e51570d7ac45805faae64152cd9ad6dd0f14088d4a60a3ade5e2403"
+      "sha256": "ecbe89a0b76bfe9f8f34ca2236ebdb0ebd74e6063112953f2c005460c7d0eeb3"
     },
     {
       "path": "app/tests/local-stt-regression.mjs",
@@ -318,7 +386,15 @@
     },
     {
       "path": "app/tests/rollback.test.mjs",
-      "sha256": "53810b335f9c1a19cee32c1377a6d457ec442f1fe129e5aebdcc2d37dc78ec8d"
+      "sha256": "badfe6df9954a4d40234b3736b7269a2d92828b3245a577a21e08db6e01c5ad8"
+    },
+    {
+      "path": "app/tests/technical-desktop.mjs",
+      "sha256": "3365b90f79d28a299caa710ffa9ccaf2edc5b37c2414c6e1bdb3b244e615ed07"
+    },
+    {
+      "path": "app/tests/technical-runtime.mjs",
+      "sha256": "196024a687de439dc2d9f9cc3b99c1ce3034c71cdede390dc02ce88274e8dc33"
     },
     {
       "path": "app/tests/technical-speech-cases.mjs",
@@ -358,7 +434,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "e6978dde2e2e45d9b73e8e718edcf6bb1f05fb1c73e577a661a9db50e425ea3d"
+      "sha256": "c31a9e0277b9430f72e0dde4e3bd615299f89fc9385e9b073032b6af1bf0e562"
     },
     {
       "path": "SECURITY.md",

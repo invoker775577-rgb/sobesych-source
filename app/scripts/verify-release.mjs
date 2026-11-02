@@ -26,7 +26,7 @@ const privateFiles = names.filter(name => !name.startsWith('node_modules/') && /
 assert.deepEqual(privateFiles, [], 'User data or development fixtures must not be shipped')
 
 assert.notEqual(packageInfo.practiceOnly, true, 'Main-channel updates must preserve call functionality')
-for (const name of ['src/transcript.mjs', 'src/domain-knowledge.mjs', 'src/practice-score.mjs', 'dist/index.html']) assert.ok(names.includes(name), `Missing runtime module: ${name}`)
+for (const name of ['src/transcript.mjs', 'src/copilot.mjs', 'src/diagram.mjs', 'src/domain-knowledge.mjs', 'src/practice-score.mjs', 'dist/index.html', 'dist/runtimes/python/pyodide.asm.wasm', 'dist/runtimes/python/python_stdlib.zip', 'dist/runtimes/sql/sql-wasm.wasm']) assert.ok(names.includes(name), `Missing runtime module: ${name}`)
 assert.ok(!names.includes('dist-practice/index.html'), 'Practice-only UI must not replace the main call application')
 const sourceFiles = names.filter(name => name === 'server.mjs' || name.startsWith('src/') || name.startsWith('dist/') || name.startsWith('electron/'))
 let checkedSources = 0

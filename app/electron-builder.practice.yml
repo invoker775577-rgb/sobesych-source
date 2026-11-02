@@ -5,6 +5,8 @@ directories:
 files:
   - dist-practice/**
   - src/transcript.mjs
+  - src/copilot.mjs
+  - src/diagram.mjs
   - src/domain-knowledge.mjs
   - src/practice-score.mjs
   - electron/**

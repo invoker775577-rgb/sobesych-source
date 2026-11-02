@@ -11,13 +11,18 @@ import { screenTaskFollowupMessages } from './screen-task.mjs'
 import { normalizeState } from './types'
 import type { Call, LocalSpeech, Message, Model, PracticeLibrary, SavedState, Settings, Speaker } from './types'
 import { UpdatePanel } from './UpdatePanel'
+import { TechnicalAnswer } from './TechnicalAnswer'
+import { parseAnswerSections } from './copilot.mjs'
+import { ContextPanel } from './ContextPanel'
+import { ModelProfiles } from './ModelProfiles'
+import type { ContextDocument } from './types'
 import { createUsageRecord, formatUsd, providerLabel, summarizeUsage, upsertUsageRecord } from './usage.mjs'
 import type { UsageOperation, UsageRecord, UsageStatus } from './usage.mjs'
 import './App.css'
 
-const fallbackSettings: Settings = { hasKey: false, baseUrl: 'https://openrouter.ai/api/v1', model: 'qwen/qwen3-30b-a3b-instruct-2507', language: 'auto', microphoneId: 'default', practiceProfile: 'devops', autoAnswer: false, transcriptionMode: 'local', transcriptionBaseUrl: 'https://openrouter.ai/api/v1', transcriptionModel: 'openai/whisper-large-v3-turbo' }
+const fallbackSettings: Settings = { hasKey: false, baseUrl: 'https://openrouter.ai/api/v1', model: 'qwen/qwen3.7-flash', codeModel: '', designModel: '', contextIds: [], language: 'auto', microphoneId: 'default', practiceProfile: 'devops', autoAnswer: false, transcriptionMode: 'local', transcriptionBaseUrl: 'https://openrouter.ai/api/v1', transcriptionModel: 'openai/whisper-large-v3-turbo' }
 const slowSpeechNotice = 'Распознавание задерживается. Подсказка появится после готовности вопроса; запрос уже принят.'
-const presets: Model[] = [{ id: 'qwen/qwen3-30b-a3b-instruct-2507', name: 'Qwen3 30B · рекомендуется' }, { id: 'mistralai/mistral-nemo', name: 'Mistral Nemo · эконом' }, { id: 'openrouter/free', name: 'Бесплатный роутер' }]
+const presets: Model[] = [{ id: 'qwen/qwen3.7-flash', name: 'Qwen3.7 Flash · по умолчанию' }, { id: 'openrouter/free', name: 'Бесплатный роутер' }]
 const labels: Record<Speaker, string> = { interviewer: 'Собеседник', me: 'Вы', assistant: 'AI', note: 'Система' }
 const inactive: AudioStatus = { active: false, level: 0, message: 'Отключён' }
 const maxTranscriptRoundQuestions = 20
@@ -127,29 +132,14 @@ function usePracticeQuestionSpeech(onError: (message: string) => void) {
 }
 
 function AnswerContent({ text }: { text: string }) {
-  const blocks = [...text.matchAll(/```([a-z0-9_-]*)\r?\n([\s\S]*?)```/gi)]
-  const content: React.ReactNode[] = []
-  let cursor = 0
-  for (const [index, block] of blocks.entries()) {
-    const start = block.index ?? cursor
-    if (text.slice(cursor, start).trim()) content.push(<p key={`text-${index}`}>{text.slice(cursor, start)}</p>)
-    content.push(<pre key={`code-${index}`}><code className={block[1] ? `language-${block[1]}` : undefined}>{block[2].replace(/\n$/, '')}</code></pre>)
-    cursor = start + block[0].length
-  }
-  const tail = text.slice(cursor)
-  const openBlock = tail.match(/```([a-z0-9_-]*)\r?\n([\s\S]*)$/i)
-  if (openBlock) {
-    if (tail.slice(0, openBlock.index).trim()) content.push(<p key="text-tail">{tail.slice(0, openBlock.index)}</p>)
-    content.push(<pre key="code-open"><code className={openBlock[1] ? `language-${openBlock[1]}` : undefined}>{openBlock[2]}</code></pre>)
-  } else if (tail.trim()) content.push(<p key="text-tail">{tail}</p>)
-  return <>{content}</>
+  return <TechnicalAnswer text={text} />
 }
 
 const TranscriptMessages = memo(function TranscriptMessages({ messages, partialText = '' }: { messages: Message[]; partialText?: string }) {
   return <>{messages.filter(m => m.speaker !== 'assistant').map(m => <article className={`bubble ${m.speaker}`} key={m.id}><div><strong>{labels[m.speaker]}</strong><time>{new Date(m.createdAt).toLocaleTimeString('ru-RU')}</time></div><p>{m.text}</p></article>)}{partialText && <article className="bubble interviewer preview" aria-label="Черновик распознавания" aria-live="polite"><div><strong>Собеседник · черновик</strong><time>сейчас</time></div><p>{partialText}</p></article>}{!messages.length && !partialText && <p className="empty">Речь пока не распознана</p>}</>
 })
 const AnswerHistory = memo(function AnswerHistory({ messages }: { messages: Message[] }) {
-  return <>{messages.filter(m => m.speaker === 'assistant').map(m => <article className="answer" key={m.id}><small>{new Date(m.createdAt).toLocaleTimeString('ru-RU')}</small><AnswerContent text={m.text} /></article>).reverse()}</>
+  return <>{messages.filter(m => m.speaker === 'assistant').map(m => <article className="answer" key={m.id}><small>{new Date(m.createdAt).toLocaleTimeString('ru-RU')}</small><TechnicalAnswer text={m.text} interactive /></article>).reverse()}</>
 })
 
 function App() {
@@ -247,6 +237,10 @@ function App() {
   const overlayRequest = useRef(0)
   const [modal, setModal] = useState<'settings' | null>(null)
   const [configDraft, setConfigDraft] = useState<Settings & { apiKey: string }>({ ...settings, apiKey: '' })
+  const [contextDocuments, setContextDocuments] = useState<ContextDocument[]>([])
+  const [contextDraft, setContextDraft] = useState<ContextDocument[]>([])
+  const [importingContext, setImportingContext] = useState(false)
+  const [contextStatus, setContextStatus] = useState({ locked: false, warning: '' })
   const [saving, setSaving] = useState(false)
   const [localSpeech, setLocalSpeech] = useState<LocalSpeech | null>(null)
   const [installingGpu, setInstallingGpu] = useState(false)
@@ -387,9 +381,13 @@ function App() {
       const config = await window.sobesych.getConfig()
       if (!alive) return
       if (config.error) throw new Error(config.error)
+      setContextDocuments(config.contextDocuments || [])
+      setContextDraft(config.contextDocuments || [])
+      setContextStatus(config.contextStatus || { locked: false, warning: '' })
       setProtectedCapture(Boolean(config.captureProtected))
       setOverlayModeState(Boolean(config.overlayMode))
-      if (config.historyWarning) setError(config.historyWarning)
+      const dataWarnings = [config.settingsWarning, config.historyWarning].filter(Boolean).join(' ')
+      if (dataWarnings) setError(dataWarnings)
       const savedLibraries = Array.isArray(config.practiceLibraries) ? config.practiceLibraries : []
       setPracticeLibraries(savedLibraries)
       if (savedLibraries[0]) {
@@ -421,7 +419,7 @@ function App() {
   useEffect(() => window.sobesych?.onAnswerDelta(event => {
     const request = currentRequest.current
     if (request?.id === event.requestId && request.generation === epoch.current) {
-      if (request.firstTokenMs === undefined && request.generationStartedAt !== undefined) {
+      if (request.firstTokenMs === undefined && request.generationStartedAt !== undefined && parseAnswerSections(event.text).answer.trim()) {
         request.firstTokenMs = Math.max(0, Math.round(clockNow() - request.generationStartedAt))
         const firstTokenMs = request.firstTokenMs
         setTiming(current => ({ ...(current?.callId === request.callId ? current : { callId: request.callId }), firstTokenMs }))
@@ -729,7 +727,7 @@ function App() {
       if (!['screen', 'extract-task', 'summary', 'expand'].includes(mode) && !followupMessages && !latestInterviewerMessage(requestMessages)) {
         throw new Error('Не удалось разобрать свежую реплику собеседника. Повтори вопрос или введи его вручную.')
       }
-      const fingerprint = JSON.stringify([requestMessages.filter(m => m.speaker !== 'assistant'), followupMessages ? task?.answerId : '', settingsRef.current.model, settingsRef.current.baseUrl])
+      const fingerprint = JSON.stringify([requestMessages.filter(m => m.speaker !== 'assistant'), followupMessages ? task?.answerId : '', settingsRef.current.model, settingsRef.current.codeModel, settingsRef.current.designModel, settingsRef.current.contextIds, settingsRef.current.baseUrl])
       trace('selected')
       const answerKey = `${id}:${mode}`
       if (mode === 'answer' && answered.current.get(answerKey) === fingerprint) {
@@ -762,6 +760,7 @@ function App() {
       trace('requested')
       const result = await window.sobesych.assist({
         requestId, mode, messages: requestMessages, partialQuestion: Boolean(liveDraft),
+        ...(!practiceOnlyBuild && call.kind !== 'practice' && ['answer', 'screen', 'clarify', 'expand'].includes(mode) ? { presentation: 'layered' as const } : {}),
         ...(Number.isSafeInteger(maxTokens) ? { maxTokens } : {}), ...(singleAttempt ? { singleAttempt: true } : {}),
         focus: mode === 'practice-report' && selectedPracticeTitle
           ? `Тренировочный сценарий: ${selectedPracticeTitle}; ${selectedPracticeQuestionCount} основных вопросов.`
@@ -1085,6 +1084,7 @@ function App() {
     } catch (e) { setError(errorText(e)) }
   }
   function openSettings() {
+    setContextDraft(contextDocuments)
     setConfigDraft({ ...settings, apiKey: '' }); setModelTestArmed(false); setAudioDiagnostic(current => ({ ...current, state: 'idle', sources: { me: inactive, interviewer: inactive }, pending: false })); setModal('settings')
     void navigator.mediaDevices.enumerateDevices().then(list => setDevices(list.filter(d => d.kind === 'audioinput'))).catch(e => setError(errorText(e)))
     void window.sobesych?.models().then(result => { if (result.models?.length) setModels(result.models); else if (result.error) setNotice(`Каталог недоступен: ${result.error}`) }).catch(e => setNotice(errorText(e)))
@@ -1187,14 +1187,24 @@ function App() {
     finally { setInstallingGpu(false) }
   }
   async function saveSettings() {
-    if (saving) return
+    if (saving || importingContext) return
     setSaving(true)
     try {
+      const materialsChanged = JSON.stringify(contextDraft) !== JSON.stringify(contextDocuments)
+      if (materialsChanged) {
+        const saved = await window.sobesych!.saveContextDocuments(contextDraft)
+        if (saved.error) throw new Error(saved.error)
+        setContextDocuments(saved.documents || contextDraft)
+      }
       const result = await window.sobesych!.saveSettings({ ...configDraft, autoAnswer: false })
       if (result.error) throw new Error(result.error)
       const inferenceChanged = result.settings.model !== settingsRef.current.model
         || result.settings.baseUrl !== settingsRef.current.baseUrl
         || result.settings.practiceProfile !== settingsRef.current.practiceProfile
+        || result.settings.codeModel !== settingsRef.current.codeModel
+        || result.settings.designModel !== settingsRef.current.designModel
+        || JSON.stringify(result.settings.contextIds) !== JSON.stringify(settingsRef.current.contextIds)
+        || materialsChanged
         || Boolean(configDraft.apiKey.trim())
       if (inferenceChanged) { cancelAnswer(); answered.current.clear() }
       updateConfig(result.settings); setConfigDraft({ ...result.settings, apiKey: '' }); setModelTestArmed(false); setModal(null); setError(''); setNotice('Настройки сохранены')
@@ -1376,7 +1386,7 @@ function App() {
             <IconButton title="Добавить реплику" action={addDraft} icon={<Send size={18} />} disabled={!draft.trim() || !selected} />
           </>}</div>
         </section>
-        <aside className="ai-pane" aria-label={selected.kind === 'practice' ? 'Разбор ответа' : 'AI Подсказки'}><div className="pane-heading"><h2><Sparkles size={17} />{selected.kind === 'practice' ? 'Разбор ответа' : 'AI Подсказки'}</h2>{iconButton('Скопировать ответ', () => void navigator.clipboard.writeText(lastAnswer?.text || '').catch(e => setError(errorText(e))), <Copy size={17} />, !lastAnswer)}</div>
+        <aside className="ai-pane" aria-label={selected.kind === 'practice' ? 'Разбор ответа' : 'AI Подсказки'}><div className="pane-heading"><h2><Sparkles size={17} />{selected.kind === 'practice' ? 'Разбор ответа' : 'AI Подсказки'}</h2>{iconButton('Скопировать ответ', () => { const text = lastAnswer?.text || ''; const parts = parseAnswerSections(text); void navigator.clipboard.writeText(parts.layered ? [parts.answer, parts.details, parts.questions, parts.assumptions, parts.diagram].filter(Boolean).join('\n\n') : text).catch(e => setError(errorText(e))) }, <Copy size={17} />, !lastAnswer)}</div>
           {selected.kind !== 'practice' && questionPreview && <div className={`heard-question ${questionPreview.state}`} data-testid="heard-question" aria-live="polite">
             <div><small>{questionPreview.state === 'partial' ? 'Черновик распознавания' : questionPreview.state === 'recognized' ? 'Распознанный вопрос' : questionPreview.state === 'correction' ? 'Последнее уточнение' : questionPreview.state === 'review' ? 'Проверьте распознавание' : 'Собеседник'}</small><p>{questionPreview.text || (pendingTranscriptions ? 'Распознаю…' : 'Жду реплику собеседника')}</p></div>
             {questionPreview.text && <IconButton title="Исправить распознанную реплику" action={() => void editInterviewerPreview()} icon={<Pencil size={15} />} />}
@@ -1384,7 +1394,7 @@ function App() {
           <div className="ai-tools"><button className="primary" title={liveAnswerDraft ? 'Ответить по черновику распознавания' : undefined} disabled={busy || !selected || (selected.kind === 'practice' && !practiceNeedsReview)} onClick={() => void ask(selected.kind === 'practice' ? 'review' : 'answer')}><Sparkles size={16} />{selected.kind === 'practice' ? 'Разобрать ответ' : 'Что сказать?'}</button>{selected.kind === 'practice' && <><button disabled={busy || !practiceCanContinue || practiceNeedsReview || practiceMicState !== 'idle'} onClick={() => void ask('practice-next')}>{hasPracticeScenario ? 'Уточнение' : 'Следующий вопрос'}</button>{hasPracticeScenario && <button disabled={busy || !practiceCanContinue || practiceNeedsReview || practiceMicState !== 'idle' || selectedPracticeStep >= selectedPracticeQuestionCount - 1} onClick={advancePracticeTrack}>Дальше по сценарию</button>}{hasPracticeScenario && <button disabled={!practiceCanReport} onClick={() => void ask('practice-report')}>{selected.practiceReportComplete ? 'Итоги готовы' : practiceReportAttempted ? 'Отчёт уже запрошен' : 'Итоговый разбор'}</button>}</>}{selected.kind !== 'practice' && <button disabled={busy} onClick={() => void ask('screen')}><Scan size={17} />Выделить задачу</button>}</div>
           {busy && <div className="thinking" role="status">{waitingForSpeech ? 'Распознаю вопрос…' : requestMode === 'practice-next' ? 'Готовлю уточнение…' : requestMode === 'practice-report' ? 'Собираю итог тренировки…' : 'Готовлю ответ…'}<IconButton title="Отменить подсказку" action={cancelAnswer} icon={<X size={16} />} /></div>}
           <div className="answers">{streamingAnswer?.callId === selectedId && streamingAnswer.text && <article className={`streaming-answer${streamingAnswer.status === 'partial' ? ' incomplete' : ''}`} aria-label={streamingAnswer.status === 'partial' ? 'Незавершённый ответ' : 'Ответ формируется'}>{streamingAnswer.status === 'partial' ? <small>Ответ оборвался · черновик</small> : streamingAnswer.mode === 'screen' && <small>Ответ по снимку · ещё формируется</small>}<AnswerContent text={streamingAnswer.text} /></article>}<AnswerHistory messages={selected.messages} />{!lastAnswer && !busy && streamingAnswer?.callId !== selectedId && <p className="empty">Пока нет подсказок</p>}</div>
-          <footer className="model-footer"><span>{settings.model}{!settings.hasKey && <span className="key-warning"> · Ключ не сохранён</span>}</span>{timing?.callId === selectedId && formatLatencyStats(timing) && <span className="latency-stats" data-testid="latency-stats" aria-label="Время распознавания и ответа">{formatLatencyStats(timing)}</span>}</footer>
+          <footer className="model-footer"><span>{selected.usage?.findLast(record => record.operation !== 'transcription')?.model || settings.model}{!settings.hasKey && <span className="key-warning"> · Ключ не сохранён</span>}</span>{timing?.callId === selectedId && formatLatencyStats(timing) && <span className="latency-stats" data-testid="latency-stats" aria-label="Время распознавания и ответа">{formatLatencyStats(timing)}</span>}</footer>
           <details className="usage-details">
             <summary>{!selected.usageTracking ? 'Расход старого звонка не записывался' : `${selected.usageTracking === 'complete' ? 'Расход звонка' : 'Частичный учёт'}: ${formatUsd(selectedUsage.knownUsd)} · ${selectedUsage.pendingCount} в процессе · ${selectedUsage.unknownCount} без цены`}</summary>
             {selected.transcriptionMode === 'local' && <p>Локальный Whisper: $0 за API-распознавание.</p>}
@@ -1405,6 +1415,7 @@ function App() {
         <datalist id="model-catalog">{models.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}</datalist>
         <div className="preset-buttons">{presets.map(m => <button className={configDraft.model === m.id ? 'selected' : ''} key={m.id} onClick={() => { setModelTestArmed(false); setConfigDraft({ ...configDraft, model: m.id }) }}>{m.name}</button>)}</div>
         {modelInfo?.pricing && <p className="price">За 1 млн токенов: ввод ${Number(modelInfo.pricing.prompt) * 1_000_000}, вывод ${Number(modelInfo.pricing.completion) * 1_000_000}{modelInfo.modalities?.includes('image') ? ' · Поддерживает картинки' : ''}</p>}
+        {!practiceOnlyBuild && <><ModelProfiles config={configDraft} models={models} onChange={value => setConfigDraft({ ...configDraft, ...value })} /><ContextPanel documents={contextDraft} selected={configDraft.contextIds || []} onChange={setContextDraft} onSelected={ids => setConfigDraft({ ...configDraft, contextIds: ids })} onLoading={setImportingContext} locked={contextStatus.locked} warning={contextStatus.warning} disabled={saving || busy} /></>}
         {practiceOnlyBuild && <section className="model-test" aria-label="Проверка модели">
           <h3>Проверить выбранную модель</h3>
           <p>Один короткий разбор. Ответ ограничен 220 токенами; автоповтора и запасной модели не будет. Если провайдер вернёт стоимость, она появится в истории.</p>
@@ -1445,7 +1456,7 @@ function App() {
           {installingGpu && <button onClick={() => void window.sobesych?.cancelGpuSpeech()}><X size={16} />Отменить загрузку</button>}
         </section>}
         <details><summary>Дополнительно</summary><label>Адрес модели<input value={configDraft.baseUrl} onChange={e => { setModelTestArmed(false); setConfigDraft({ ...configDraft, baseUrl: e.target.value }) }} /></label>{configDraft.transcriptionMode === 'openrouter' && <><label>Адрес распознавания<input value={configDraft.transcriptionBaseUrl} onChange={e => setConfigDraft({ ...configDraft, transcriptionBaseUrl: e.target.value })} /></label><label>Модель распознавания<input value={configDraft.transcriptionModel} onChange={e => setConfigDraft({ ...configDraft, transcriptionModel: e.target.value })} /></label></>}<label>Язык<select value={configDraft.language} onChange={e => setConfigDraft({ ...configDraft, language: e.target.value })}><option value="auto">Авто: русский и английский</option><option value="ru">Русский</option><option value="en">English</option></select></label></details>
-        <footer><a href="https://openrouter.ai/settings/credits" target="_blank" rel="noreferrer">Баланс OpenRouter</a><button onClick={() => void window.sobesych!.openLogs().then(r => { if (r.error) setError(r.error) })}>Логи</button><button onClick={() => closeSettings()} disabled={saving}>Отмена</button><button className="primary" onClick={() => void saveSettings()} disabled={saving || audioDiagnostic.state !== 'idle'}>{saving ? 'Сохраняю…' : 'Сохранить'}</button></footer>
+        <footer><a href="https://openrouter.ai/settings/credits" target="_blank" rel="noreferrer">Баланс OpenRouter</a><button onClick={() => void window.sobesych!.openLogs().then(r => { if (r.error) setError(r.error) })}>Логи</button><button onClick={() => closeSettings()} disabled={saving}>Отмена</button><button className="primary" onClick={() => void saveSettings()} disabled={saving || importingContext || audioDiagnostic.state !== 'idle'}>{saving ? 'Сохраняю…' : 'Сохранить'}</button></footer>
     </section></div>}
     {deleteId && <div className="modal-backdrop"><section className="modal confirm" role="dialog" aria-modal="true" aria-label="Удалить звонок"><h2>Удалить звонок?</h2><footer><button onClick={() => setDeleteId(null)}>Отмена</button><button className="danger" onClick={() => { commit({ ...dataRef.current, calls: dataRef.current.calls.filter(c => c.id !== deleteId) }); if (selectedId === deleteId) choose(null); setDeleteId(null) }}>Удалить</button></footer></section></div>}
     {deletePracticeLibraryId && <div className="modal-backdrop"><section className="modal confirm" role="dialog" aria-modal="true" aria-label="Удалить подборку вопросов"><h2>Удалить сохранённую подборку?</h2><p>Удалится этот набор. Уже начатые тренировки останутся в истории, а исходные TXT не затрагиваются.</p><footer><button onClick={() => setDeletePracticeLibraryId('')} disabled={practiceLibrarySaving}>Отмена</button><button className="danger" onClick={() => void confirmDeletePracticeLibrary()} disabled={practiceLibrarySaving}>{practiceLibrarySaving ? 'Удаляю…' : 'Удалить'}</button></footer></section></div>}

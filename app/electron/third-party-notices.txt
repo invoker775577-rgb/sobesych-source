@@ -1,5 +1,27 @@
 Sobesych local voice activity detection
 
+Optional code verification and document reading
+
+Pyodide 314.0.7 is distributed under MPL-2.0. Source and build materials:
+https://github.com/pyodide/pyodide/tree/314.0.7
+The runtime files are copied unchanged. The sandbox adapter supplies fixed in-memory
+WASM bytes and evaluates the module wrapper without its dynamic import.
+The MPL license is in licenses/PYODIDE-MPL-2.0.txt and beside the runtime files.
+CPython's license is in licenses/CPYTHON.txt and beside the runtime files.
+
+sql.js 1.15.2 (MIT): https://github.com/sql-js/sql.js/tree/v1.15.2
+License: licenses/SQLJS.txt and beside the SQLite runtime files.
+SQLite is public domain: https://sqlite.org/copyright.html
+
+PDF.js 6.5.438 (Apache-2.0): https://github.com/mozilla/pdf.js
+License: licenses/PDFJS.txt
+fflate 0.8.3 (MIT): https://github.com/101arrowz/fflate/tree/v0.8.3
+License: licenses/FFLATE.txt
+
+These environments load only after an explicit code check or document import.
+
+Voice activity detection
+
 @ozymandiasthegreat/vad 2.0.7
 JavaScript wrapper by Tomas Ravinskas; package metadata declares the MIT license.
 https://github.com/OzymandiasTheGreat/libfvad-wasm

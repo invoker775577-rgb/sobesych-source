@@ -6,6 +6,7 @@ const { pathToFileURL } = require('node:url')
 const { randomUUID } = require('node:crypto')
 const { spawn } = require('node:child_process')
 const { createStore } = require('./store.cjs')
+const { createContextStore } = require('./context-store.cjs')
 const { formatAnswerTrace } = require('./answer-trace.cjs')
 const { createUpdates, createWindowsUpdater } = require('./updates.cjs')
 const { createLocalStt, shouldUseLocalTranscription, formatTranscriptionTrace } = require('./local-stt.cjs')
@@ -155,7 +156,8 @@ else {
     const { createService, resolveSettings } = await import(pathToFileURL(path.join(__dirname, '..', 'server.mjs')).href)
     const env = loadRuntimeEnv()
     store = createStore(directory, safeStorage, { apiKey: env.OPENAI_API_KEY || env.OPENROUTER_API_KEY || '', baseUrl: env.OPENAI_BASE_URL, model: env.OPENAI_MODEL }, resolveSettings)
-    const service = createService({ getSettings: store.getSettings })
+    const contextStore = createContextStore(directory, safeStorage)
+    const service = createService({ getSettings: store.getSettings, getContextDocuments: () => contextStore.forRequest(store.getSettings().contextIds) })
     const updateEnabled = app.isPackaged && process.platform === 'win32' && !process.env.PORTABLE_EXECUTABLE_FILE &&
       fs.existsSync(path.join(path.dirname(process.execPath), `Uninstall ${app.getName()}.exe`)) &&
       fs.existsSync(path.join(process.resourcesPath, 'app-update.yml'))
@@ -187,7 +189,7 @@ else {
     })
     handle('app:config', () => {
       const { pid: _pid, ...localSpeech } = localStt.status()
-      return { settings: store.publicConfig(), state: store.loadState(), practiceLibraries: store.getPracticeLibraries(), practiceLibrariesStatus: store.practiceLibrariesStatus(), practiceLibrariesWarning: store.practiceLibrariesWarning(), historyWarning: store.historyWarning(), captureProtected: mainWindow.isContentProtected(), overlayMode, localSpeech, practiceOnly: practiceOnlyBuild, version: app.getVersion() }
+      return { settings: store.publicConfig(), state: store.loadState(), settingsWarning: store.settingsWarning(), contextDocuments: contextStore.list(), contextStatus: contextStore.status(), practiceLibraries: store.getPracticeLibraries(), practiceLibrariesStatus: store.practiceLibrariesStatus(), practiceLibrariesWarning: store.practiceLibrariesWarning(), historyWarning: store.historyWarning(), captureProtected: mainWindow.isContentProtected(), overlayMode, localSpeech, practiceOnly: practiceOnlyBuild, version: app.getVersion() }
     })
     handle('settings:save', update => {
       const settings = store.saveSettings(update)
@@ -195,6 +197,16 @@ else {
     })
     handle('state:save', value => store.saveState(value))
     handle('practice-libraries:save', value => store.savePracticeLibraries(value))
+    handle('context:save', value => contextStore.save(value))
+    handle('diagram:export', async source => {
+      if (typeof source !== 'string') throw new Error('Схема не получена')
+      const { diagramSvg } = await import('../src/diagram.mjs')
+      const svg = diagramSvg(source)
+      const result = await dialog.showSaveDialog(mainWindow, { defaultPath: 'architecture.svg', filters: [{ name: 'SVG', extensions: ['svg'] }] })
+      if (result.canceled || !result.filePath) return { cancelled: true }
+      fs.writeFileSync(result.filePath, svg, 'utf8')
+      return { ok: true }
+    })
     handle('audio:trace', value => {
       const stages = ['display', 'display-failed', 'desktop', 'desktop-failed', 'retry', 'ready', 'failed']
       const codes = ['none', 'other', 'NotReadableError', 'NotAllowedError', 'SecurityError', 'NotFoundError', 'AbortError', 'InvalidStateError', 'NotSupportedError']
