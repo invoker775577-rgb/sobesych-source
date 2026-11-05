@@ -71,9 +71,11 @@ function Body({ text, interactive }: { text: string; interactive: boolean }) {
 }
 export function TechnicalAnswer({ text, interactive = false }: { text: string; interactive?: boolean }) {
   const sections = parseAnswerSections(text)
-  if (!sections.layered) return <Body text={text} interactive={interactive} />
+  const scenarioLabel = sections.illustrative && <small className="scenario-label" title="Вымышленная ситуация для подготовки">Учебный сценарий</small>
+  if (!sections.layered) return <>{scenarioLabel}<Body text={sections.illustrative ? sections.answer : text} interactive={interactive} /></>
   const questions = sections.questions.split('\n').map(line => line.replace(/^\s*(?:[-*]|\d+[.)])\s*/, '').trim()).filter(Boolean)
   return <div className={`technical-answer ${sections.kind}`}>
+    {scenarioLabel}
     {sections.answer && <div className="spoken-answer"><Body text={sections.answer} interactive={interactive} /></div>}
     {sections.details && <details className="answer-details" open={sections.kind === 'code' || sections.kind === 'design'}><summary>{sections.kind === 'code' ? 'Решение и проверки' : sections.kind === 'design' ? 'Архитектура и расчёты' : 'Подробнее'}</summary><Body text={sections.details} interactive={interactive} /></details>}
     {questions.length > 0 && <details className="clarification-questions"><summary>Что уточнить у собеседника</summary>{questions.map((question, index) => <p key={index}>{question}</p>)}</details>}

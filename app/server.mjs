@@ -677,7 +677,7 @@ export function createService({ getSettings = () => resolveSettings({}, { apiKey
       const spokenSystem = `${humanReplyRule} ${questionClarityRule} ${questionFocusRule} ${english ? `${englishSystemPrompt} ${englishAccuracyRule}` : `${systemPrompt} ${accuracyRule}`} ${spokenLanguageRule} ${exampleRule}`
       const codeContext = codeAnswer ? previousCodeContext(lines, latestQuestion) : null
       const numericIdentifierRule = enhanced && ['code', 'screen'].includes(enhanced.kind) ? unclearNumericIdentifierRule(enhanced.turns) : codeAnswer ? unclearNumericIdentifierRule(codeContext?.turns || conversationContext(lines, mode, latestQuestion, 12_000)) : ''
-      const defaultMaxTokens = enhanced?.maxTokens || (screenFollowup ? tokenLimits.screen : codeAnswer ? tokenLimits.code : caseAnswer ? english ? 320 : 600 : mode === 'answer' ? english ? 240 : 430 : tokenLimits[mode] || tokenLimits.answer)
+      const defaultMaxTokens = enhanced?.maxTokens || (screenFollowup ? tokenLimits.screen : codeAnswer ? tokenLimits.code : caseAnswer ? english ? 400 : 900 : mode === 'answer' ? english ? 240 : 430 : tokenLimits[mode] || tokenLimits.answer)
       const requestedMaxTokens = Number.isSafeInteger(input.maxTokens) ? Math.max(64, input.maxTokens) : defaultMaxTokens
       const maxTokens = Math.min(defaultMaxTokens, requestedMaxTokens)
       // Model-specific options must be rebuilt on retry, not inherited from the first model.

@@ -1,5 +1,5 @@
 {
-  "applicationVersion": "0.5.87",
+  "applicationVersion": "0.5.88",
   "includesUnreleasedFixes": false,
   "hashNormalization": "UTF-8 text CRLF to LF; binary files unchanged",
   "exportPolicy": "Application source and synthetic tests only; no private Git history, profiles, recordings or evidence",
@@ -126,11 +126,11 @@
     },
     {
       "path": "app/package-lock.json",
-      "sha256": "f14b264f8ba3925e00fdf3b56f7442461fddf0bd1531ca0b3140fd21ba791d77"
+      "sha256": "540b24e7d5974731d279bb1ee7b5fecf93d05403944b7db56c955d66ac919727"
     },
     {
       "path": "app/package.json",
-      "sha256": "631c0ee4510476167026f5bf215f517c48edd13ab96a81e0059f6745baca33aa"
+      "sha256": "8eb2803c16a58d7d167b86d420f04ba80c90c71fc833c23e15a8a6327649baf6"
     },
     {
       "path": "app/public/favicon.svg",
@@ -166,15 +166,15 @@
     },
     {
       "path": "app/server.mjs",
-      "sha256": "7bd20a47a5f5c5dc029dfc7049059339da6938fca47cdd8aee8b2a2898e1806e"
+      "sha256": "cb0d0c69d57cd77de42cf56f9474664212514de6dc5469fe8734f26c6fd888b1"
     },
     {
       "path": "app/src/App.css",
-      "sha256": "a96ea863a834d83981345ec5eee27688db754cf7666a8a9fb1cb18653d126bfb"
+      "sha256": "de5fc4e811759df96a37f9ad12597a42c562d8e37e1360157edc1021854a4760"
     },
     {
       "path": "app/src/App.tsx",
-      "sha256": "4b7401e5089579f754e3cf3e7dc3a0bf800c4532c80fedffea607bb39af1c9ba"
+      "sha256": "422fd109729bf45f546d1f537075b2c22c3337b3e4e5d7d3ca428ea911caab50"
     },
     {
       "path": "app/src/assets/hero.png",
@@ -218,11 +218,11 @@
     },
     {
       "path": "app/src/copilot.d.mts",
-      "sha256": "690b74a666aa93c1f95255b8beedff446d6117bef13ecf24bc4d83568a72d386"
+      "sha256": "0f8004356c1a92e44b1b8cdf8e4ec24f3e08de5582e5dcb89c67d10c50428ca9"
     },
     {
       "path": "app/src/copilot.mjs",
-      "sha256": "473c821e7ef43cf57817822e57ec454f8c99aba4648143ce4aabfd3f854db6e9"
+      "sha256": "d0f6e7401dee7bd5a7784e79aa8d9110c1bda2faffa2a633e2031e3770dddd22"
     },
     {
       "path": "app/src/diagram.d.mts",
@@ -234,7 +234,7 @@
     },
     {
       "path": "app/src/domain-knowledge.mjs",
-      "sha256": "d7fbd7fe2c8b5ff04e986917273b24ad22c08bce3dd6702a4b1da81218103787"
+      "sha256": "354f03b6d824ddff6bc8d00fcdb19fa0d8a3e6477d50d7d320ec0eee33a2b16d"
     },
     {
       "path": "app/src/index.css",
@@ -310,7 +310,7 @@
     },
     {
       "path": "app/src/TechnicalAnswer.tsx",
-      "sha256": "478663b5ca76a95fc1ac020221e28ed78a3d61a2aca4efd2b52bae11af223b5c"
+      "sha256": "d29322878a832f19dd769d1fabf18fbc86e70e5e64767616b8de06e2c6e82114"
     },
     {
       "path": "app/src/transcript.d.mts",
@@ -362,7 +362,7 @@
     },
     {
       "path": "app/tests/copilot.test.mjs",
-      "sha256": "9a4b4412ac309bc3686add0f5e20394c0a040237fac2434ae345c5da6c99cf5a"
+      "sha256": "45804f1ada5ae623461d40f4c071680df7560f5155a0b6c3615f89d6ed12ad1c"
     },
     {
       "path": "app/tests/generic-answers.test.mjs",
@@ -418,7 +418,7 @@
     },
     {
       "path": "app/tests/technical-desktop.mjs",
-      "sha256": "1606b2ea9dfb1a0f1f36db9ca204f4a06fced2733a96e42b1400f3d0bd5d8e2b"
+      "sha256": "c78dc232eebebc7a96e69901dbe68282676545594a0e0013f99af53b1a7dc8f3"
     },
     {
       "path": "app/tests/technical-runtime.mjs",
@@ -462,7 +462,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "7759c25ac9f20c10b831f96679501c97a63d5c1206af423ab6b0ae1d34f130e6"
+      "sha256": "5a2dd47245a592e92278840788d63cefe399cc027398207773c52a2ee958dc5e"
     },
     {
       "path": "SECURITY.md",

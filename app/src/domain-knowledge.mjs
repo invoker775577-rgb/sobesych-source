@@ -1,5 +1,13 @@
 const TOPICS = [
   {
+    id: 'kubectl-purpose',
+    // https://kubernetes.io/docs/reference/kubectl/
+    match: /kubectl/iu,
+    requireAny: [/что такое|для чего|what is|what.*used for|зачем|how.*use/iu],
+    guidance: ['kubectl — программа для команд Kubernetes, не сама командная строка. Ею смотрят поды и логи, применяют манифесты и управляют объектами кластера через API server. Она не управляет данными внутри базы вместо SQL-клиента.'],
+    english: ['kubectl is a command-line tool, not the shell itself. It lists pods, reads logs, applies manifests and manages Kubernetes objects through the API server; it does not replace a database client for managing stored data.'],
+  },
+  {
     id: 'kubernetes-lifecycle-memory',
     // https://kubernetes.io/docs/concepts/workloads/controllers/deployment/
     // https://kubernetes.io/docs/tasks/configure-pod-container/assign-memory-resource/

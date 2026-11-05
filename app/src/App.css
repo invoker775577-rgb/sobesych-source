@@ -302,3 +302,5 @@ summary { cursor: pointer; color: #a4cde4; }
 .call-review { padding: 10px 16px; border-top: 1px solid var(--border, #33413c); font-size: 13px; }
 .call-review p { white-space: pre-wrap; }
 .budget-status { padding: 4px 16px; font-size: 12px; }
+
+.scenario-label { display: block; color: var(--muted); font-size: 11px; margin-bottom: 6px; }

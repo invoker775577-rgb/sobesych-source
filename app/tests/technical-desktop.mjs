@@ -194,13 +194,18 @@ try {
   ]) {
     for (const [step, question] of [root, more, why, root.startsWith('Describe') ? 'What did you do personally?' : 'Что сделал лично?', root.startsWith('Describe') ? 'What was the outcome?' : 'Чем всё закончилось?', next].entries()) {
       const marker = `CASE_BUTTON_${root.startsWith('Describe') ? 'EN' : 'RU'}_${step}`
-      plans.push({ text: `:::kind general\n:::answer\n${marker}` })
+      plans.push({ text: `:::kind general\n:::answer\n${step === 0 ? root.startsWith('Describe') ? 'Example scenario. ' : 'Пример кейса. ' : ''}${marker}` })
       await addQuestion(question); await ask()
       await page.locator('.answer .spoken-answer').getByText(marker, { exact: true }).waitFor()
       const payload = received.at(-1)
       assert.match(payload.messages[0].content, /not a reply about yourself/)
       const context = JSON.stringify(payload.messages[1].content)
-      if (step === 0) assert.match(payload.messages[0].content, /2-3 concrete actions|2-3 действия/)
+      if (step === 0) {
+        assert.match(payload.messages[0].content, /2-3 concrete actions|2-3 действия/)
+        const answer = page.locator('.answer').filter({ hasText: marker })
+        await answer.getByText('Учебный сценарий', { exact: true }).waitFor()
+        assert.doesNotMatch(await answer.locator('.spoken-answer').innerText(), /Пример кейса|Example scenario/)
+      }
       if (step >= 1 && step <= 4) {
         assert.ok(context.includes(root), 'Real button must keep the original case question')
         assert.match(context, /CASE_BUTTON_/)

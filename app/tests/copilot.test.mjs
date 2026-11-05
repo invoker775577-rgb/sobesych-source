@@ -266,3 +266,14 @@ test('safe diagrams reject commands, links, invalid syntax and unbounded graphs'
   assert.match(svg, /&lt;script&gt;/); assert.doesNotMatch(svg, /<script>/)
   assert.throws(() => diagramSvg('click A "javascript:alert(1)"'))
 })
+
+test('illustrative labels remain metadata instead of spoken text in RU and EN', () => {
+  for (const label of ['Пример кейса.', 'Example scenario.']) {
+    const result = parseAnswerSections(`:::kind general\n:::answer\n${label} A service accepts orders.`)
+    assert.equal(result.illustrative, true)
+    assert.equal(result.answer, 'A service accepts orders.')
+  }
+  const code = parseAnswerSections(':::kind code\n:::answer\nUse this query.\n:::details\n```sql\nSELECT \'Example scenario.\';\n```')
+  assert.match(code.details, /Example scenario/)
+  assert.equal(code.illustrative, undefined)
+})
