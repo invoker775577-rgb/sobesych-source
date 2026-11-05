@@ -292,3 +292,13 @@ summary { cursor: pointer; color: #a4cde4; }
 .model-estimate label { flex: 1 1 160px; }
 .context-actions .file-import { display: inline-flex; align-items: center; border: 1px solid #47545b; border-radius: 6px; padding: 8px 12px; cursor: pointer; }
 .file-import input { max-width: 180px; }
+
+.readiness-panel { margin-top: 24px; padding: 16px; border: 1px solid var(--border, #33413c); border-radius: 10px; text-align: left; max-width: 560px; }
+.readiness-panel ul { padding-left: 20px; font-size: 13px; line-height: 1.6; }
+.readiness-panel small { display: block; margin-top: 10px; }
+.answer-feedback { margin-top: 12px; font-size: 12px; opacity: .85; }
+.answer-feedback button { margin: 8px 6px 8px 0; }
+.answer-feedback small { display: block; }
+.call-review { padding: 10px 16px; border-top: 1px solid var(--border, #33413c); font-size: 13px; }
+.call-review p { white-space: pre-wrap; }
+.budget-status { padding: 4px 16px; font-size: 12px; }

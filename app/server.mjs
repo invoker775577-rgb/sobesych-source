@@ -5,12 +5,13 @@ import { latestInterviewerMessage, localSocialReply, isCodeRequest, isCodeChange
 import { lookupDomainKnowledge } from './src/domain-knowledge.mjs'
 import { visiblePracticeReport } from './src/practice-score.mjs'
 import { activeTask, copilotRequest } from './src/copilot.mjs'
+import { createCallBudget } from './src/call-budget.mjs'
 
 export const defaults = {
   baseUrl: 'https://openrouter.ai/api/v1', model: 'qwen/qwen3.7-flash',
   transcriptionBaseUrl: 'https://openrouter.ai/api/v1', transcriptionModel: 'openai/whisper-large-v3-turbo',
   transcriptionMode: 'local', language: 'auto', microphoneId: 'default', practiceProfile: 'devops', autoAnswer: false,
-  codeModel: '', designModel: '', contextIds: [],
+  codeModel: '', designModel: '', fallbackModel: '', cpuSpeechModel: 'large-v3-turbo', callBudgetUsd: 0, contextIds: [],
 }
 export function textOr(value, fallback = '') {
   return typeof value === 'string' && value.trim() ? value.trim() : fallback
@@ -27,7 +28,12 @@ export function resolveSettings(input = {}, fallback = {}) {
   const result = { ...defaults }
   for (const key of ['apiKey', ...Object.keys(defaults).filter(k => k !== 'autoAnswer')]) result[key] = textOr(input[key], textOr(fallback[key], defaults[key] || ''))
   result.autoAnswer = typeof input.autoAnswer === 'boolean' ? input.autoAnswer : fallback.autoAnswer ?? defaults.autoAnswer
-  for (const key of ['codeModel', 'designModel']) result[key] = typeof input[key] === 'string' ? input[key].trim().slice(0, 160) : typeof fallback[key] === 'string' ? fallback[key] : ''
+  for (const key of ['codeModel', 'designModel', 'fallbackModel']) result[key] = typeof input[key] === 'string' ? input[key].trim().slice(0, 160) : typeof fallback[key] === 'string' ? fallback[key] : ''
+  const budget = input.callBudgetUsd ?? fallback.callBudgetUsd ?? 0
+  if (typeof budget !== 'number' || !Number.isFinite(budget) || budget < 0 || budget > 100) throw new Error('Лимит звонка должен быть от 0 до 100 долларов')
+  result.callBudgetUsd = budget
+  result.cpuSpeechModel = input.cpuSpeechModel ?? fallback.cpuSpeechModel ?? 'large-v3-turbo'
+  if (!['base', 'small', 'large-v3-turbo'].includes(result.cpuSpeechModel)) throw new Error('Неизвестная локальная модель речи')
   result.contextIds = [...new Set((Array.isArray(input.contextIds) ? input.contextIds : Array.isArray(fallback.contextIds) ? fallback.contextIds : []).filter(id => typeof id === 'string' && /^[\w-]{1,80}$/.test(id)))].slice(0, 8)
   if (!['local', 'openrouter'].includes(result.transcriptionMode)) result.transcriptionMode = 'local'
   if (!['devops', 'support'].includes(result.practiceProfile)) result.practiceProfile = 'devops'
@@ -541,7 +547,8 @@ const questionFocusRule = 'When a turn contains conversational asides before a s
 const exampleRule = 'For a work case or personal question, give a useful sample answer instead of rejecting it for missing biography. Start invented scenarios with "Пример кейса." or "Example scenario." and use conditional actions, not claims that the candidate really did them. Do not invent employers or personal measurements. When asked for more detail, continue the same scenario and keep its assumptions unless correcting a technical error.'
 const tokenLimits = { answer: 450, code: 1800, expand: 450, clarify: 320, 'practice-next': 120, review: 850, 'practice-report': 1100, summary: 620, screen: 1800, 'extract-task': 1200 }
 
-export function createService({ getSettings = () => resolveSettings({}, { apiKey: process.env.OPENAI_API_KEY, baseUrl: process.env.OPENAI_BASE_URL, model: process.env.OPENAI_MODEL }), getContextDocuments = () => [], fetchImpl = fetch } = {}) {
+export function createService({ getSettings = () => resolveSettings({}, { apiKey: process.env.OPENAI_API_KEY, baseUrl: process.env.OPENAI_BASE_URL, model: process.env.OPENAI_MODEL }), getContextDocuments = () => [], fetchImpl = fetch, budgetLedger = createCallBudget() } = {}) {
+  let budgetCatalog = []; let budgetCatalogAt = 0
   let visionCatalog = null
   let visionCatalogAt = 0
   let visionCatalogUrl = ''
@@ -632,6 +639,7 @@ export function createService({ getSettings = () => resolveSettings({}, { apiKey
     return data
   }
   return {
+    budgetStatus: id => budgetLedger.status(id, getSettings().callBudgetUsd || 0),
     async assist(input, signal, onDelta) {
       const shortcut = localAnswer(input)
       if (shortcut) {
@@ -659,9 +667,9 @@ export function createService({ getSettings = () => resolveSettings({}, { apiKey
       const openRouter = config.baseUrl.includes('openrouter.ai')
       const freeModel = isFreeModelId(model) || (visionMode && visionCatalogUrl === config.baseUrl && visionCatalog?.some(item => item.id === model && hasZeroModelPricing(item)))
       const fallbacks = input.singleAttempt ? [] : visionMode
-        ? visionModels.slice(1)
-        : openRouter && !freeModel
-          ? [model === 'qwen/qwen3.7-flash' ? 'google/gemma-3-27b-it' : 'qwen/qwen3.7-flash']
+        ? visionModels.filter(id => id === config.fallbackModel && id !== model)
+        : openRouter && !freeModel && config.fallbackModel && config.fallbackModel !== model
+          ? [config.fallbackModel]
           : []
       const endpoint = `${config.baseUrl}/${ollama ? 'api/chat' : 'chat/completions'}`
       const mode = input.mode || 'answer'
@@ -680,12 +688,36 @@ export function createService({ getSettings = () => resolveSettings({}, { apiKey
       // Model-specific options must be rebuilt on retry, not inherited from the first model.
       const payloadFor = targetModel => ({
         model: targetModel, temperature: visionMode ? 0.1 : 0.2, max_tokens: maxTokens,
-        ...(openRouter && targetModel === 'qwen/qwen3.7-flash' ? { reasoning: { enabled: false } } : {}),
+        ...(openRouter && ['qwen/qwen3.7-flash', 'qwen/qwen3.8-flash'].includes(targetModel) ? { reasoning: { enabled: false } } : {}),
         ...(ollama ? { stream: false } : streamEnabled ? { stream: true, stream_options: { include_usage: true } } : {}),
       messages: [{ role: 'system', content: enhanced ? `${enhanced.system}\n${questionClarityRule} ${questionFocusRule} ${spokenLanguageRule} ${english ? englishAccuracyRule : accuracyRule} ${numericIdentifierRule}${screenRules ? `\nScreen-specific content rules override ordinary prose limits; keep the section markers.\n${screenRules}` : ''}` : (input.mode === 'extract-task' ? extractTaskPrompt : input.mode === 'screen' ? screenSystemPrompt + screenLanguageRule(input) : screenFollowup ? screenFollowupSystemPrompt : input.mode === 'practice-next' ? english ? englishPracticeInterviewerSystemPrompt : practiceInterviewerSystemPrompt : input.mode === 'practice-report' ? english ? englishPracticeReportSystemPrompt : practiceReportSystemPrompt : input.mode === 'review' ? english ? englishReviewSystemPrompt : reviewSystemPrompt : codeAnswer ? `${codeSystemPrompt} ${numericIdentifierRule} ${english ? 'Explain ONLY in simple A1-A2 English.' : 'Объясняй только по-русски простыми словами.'}` : spokenSystem) }, { role: 'user', content }],
       })
       const clean = cleanSpokenAnswer
       const streamAnswer = streamEnabled ? partial => onDelta(input.mode === 'practice-report' ? visiblePracticeReport(partial) : clean(partial)) : undefined
+      const attempts = []
+      const send = async target => {
+        const payload = payloadFor(target)
+        if (config.callBudgetUsd && !ollama) {
+          if (url.origin !== 'https://openrouter.ai' || url.pathname.replace(/\/$/, '') !== '/api/v1') throw new Error('Лимит поддерживает OpenRouter. Для другого провайдера сначала явно отключи лимит.')
+          if (!budgetCatalog.length || Date.now() - budgetCatalogAt > 600_000) {
+            const catalog = await request(`${config.baseUrl}/models`, null, config.apiKey, signal)
+            budgetCatalog = catalog.data || []; budgetCatalogAt = Date.now()
+          }
+        }
+        signal?.throwIfAborted()
+        const reservation = budgetLedger.reserve(input.callId, ollama ? 0 : config.callBudgetUsd, payload, budgetCatalog)
+        attempts.push(target)
+        try {
+          const result = await request(endpoint, payload, config.apiKey, signal, streamAnswer)
+          reservation.settle(result.usage)
+          return result
+        } catch (error) {
+          reservation.settle(error.usage)
+          error.budget = budgetLedger.status(input.callId, config.callBudgetUsd)
+          error.attempts = [...attempts]
+          throw error
+        }
+      }
       let data
       let answer = ''
       let effectiveModel = model
@@ -697,7 +729,7 @@ export function createService({ getSettings = () => resolveSettings({}, { apiKey
         effectiveModel = fallbacks[0]
         retried = true
         try {
-          const result = await request(endpoint, payloadFor(effectiveModel), config.apiKey, signal, streamAnswer)
+          const result = await send(effectiveModel)
           result.usage = combineProviderUsage([firstAttemptUsage, result.usage])
           return result
         } catch (error) {
@@ -707,7 +739,7 @@ export function createService({ getSettings = () => resolveSettings({}, { apiKey
         }
       }
       try {
-        data = await request(endpoint, payloadFor(model), config.apiKey, signal, streamAnswer)
+        data = await send(model)
       } catch (error) {
         error.model ??= model
         const retryable = [408, 425, 429, 500, 502, 503, 504].includes(error?.status)
@@ -736,10 +768,11 @@ export function createService({ getSettings = () => resolveSettings({}, { apiKey
         throw error
       }
       if (retried) streamAnswer?.(answer)
-      return { answer, model: data.model || effectiveModel, usage, ...(enhanced ? { answerKind: enhanced.kind, usedContextIds: enhanced.usedContextIds } : {}) }
+      return { answer, model: data.model || effectiveModel, usage, requestedModel: profileModel, attempts, budget: budgetLedger.status(input.callId, config.callBudgetUsd), ...(enhanced ? { answerKind: enhanced.kind, usedContextIds: enhanced.usedContextIds } : {}) }
     },
     async transcribe(input, signal) {
       const config = getSettings()
+      if (config.callBudgetUsd) throw new Error('Облачное распознавание не поддерживает лимит звонка. Выбери бесплатное локальное распознавание или явно отключи лимит.')
       if (!config.apiKey) throw new Error('Ключ OpenRouter не сохранён в настройках')
       const data = await request(`${config.transcriptionBaseUrl}/audio/transcriptions`, {
         model: config.transcriptionModel, input_audio: parseAudio(input), ...(config.language === 'auto' ? {} : { language: config.language.split('-')[0] }), temperature: 0,
@@ -747,7 +780,8 @@ export function createService({ getSettings = () => resolveSettings({}, { apiKey
       return { text: textOr(data.text), model: config.transcriptionModel, usage: data.usage }
     },
     async models(_input, signal) {
-      const data = await request('https://openrouter.ai/api/v1/models', null, null, signal)
+      const config = getSettings()
+      const data = await request(`${config.baseUrl}/models`, null, config.apiKey, signal)
       return { models: (data.data || []).map(m => ({ id: m.id, name: m.name, pricing: m.pricing, context_length: m.context_length, modalities: m.architecture?.input_modalities || [] })) }
     },
   }

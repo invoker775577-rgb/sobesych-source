@@ -29,11 +29,13 @@ test('standalone practice keeps a separate identity and interface', () => {
   assert.ok(practice.files.includes('dist-practice/**'))
 })
 
-test('main builds bundle the unchanged speech model with CPU runtime, not optional CUDA or benchmark models', () => {
+test('installer keeps speech weights external; portable retains its offline model and both include CPU engine', () => {
   const main = read('electron-builder.windows.yml')
   const portable = JSON.parse(readFileSync(new URL('../package.json', import.meta.url))).build
   for (const config of [main, portable]) {
-    assert.deepEqual(config.extraResources, [{ from: 'vendor/local-stt-cpu', to: 'local-stt', filter: ['ggml-large-v3-turbo-q5_0.bin', 'cpu/Release/*.dll', 'cpu/Release/whisper-server.exe'] }])
+    assert.deepEqual(config.extraResources, [{ from: 'vendor/local-stt-cpu', to: 'local-stt', filter: [...(config === main ? [] : ['ggml-large-v3-turbo-q5_0.bin']), 'cpu/Release/*.dll', 'cpu/Release/whisper-server.exe'] }])
+    assert.ok(config.files.includes('scripts/install-cpu-stt.ps1'))
+    assert.ok(config.asarUnpack.includes('scripts/install-cpu-stt.ps1'))
     assert.ok(config.files.includes('scripts/install-local-stt.ps1'))
     assert.ok(config.asarUnpack.includes('scripts/install-local-stt.ps1'))
     assert.deepEqual(config.electronLanguages, ['en-US', 'ru'])

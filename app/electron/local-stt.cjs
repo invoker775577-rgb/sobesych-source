@@ -73,15 +73,18 @@ function freePort() {
 
 function createLocalStt(directory, bundledRoot, options = {}) {
   const roots = [...new Set([bundledRoot, path.join(directory, 'local-stt'), options.cpuRoot].filter(Boolean))]
-  const find = (backend, modelName) => {
-    const model = roots.map(root => path.join(root, modelName)).find(file => fs.existsSync(file))
-    if (!model) return null
+  const engine = backend => {
     for (const root of roots) {
       const exe = path.join(root, backend, 'Release', 'whisper-server.exe')
       const libraries = backend === 'cuda' ? ['cublas64_11.dll', 'cublasLt64_11.dll', 'ggml-cuda.dll', 'ggml.dll', 'ggml-base.dll', 'whisper.dll', 'cudart64_110.dll'] : []
-      if (fs.existsSync(exe) && libraries.every(name => fs.existsSync(path.join(path.dirname(exe), name)))) return { exe, model, backend }
+      if (fs.existsSync(exe) && libraries.every(name => fs.existsSync(path.join(path.dirname(exe), name)))) return exe
     }
     return null
+  }
+  const find = (backend, modelName) => {
+    const model = roots.map(root => path.join(root, modelName)).find(file => fs.existsSync(file))
+    const exe = engine(backend)
+    return model && exe ? { exe, model, backend } : null
   }
   const cpus = Math.max(1, (os.availableParallelism?.() || os.cpus().length) - 1)
   const cpuThreads = Math.max(1, Math.min(options.threads || Math.ceil((cpus + 1) / 2), 4, cpus))
@@ -99,12 +102,13 @@ function createLocalStt(directory, bundledRoot, options = {}) {
     if (startPromise) return startPromise
     const current = generation
     const pending = (async () => {
-      const cpu = find('cpu', options.cpuModel ? `ggml-${options.cpuModel}-q5_1.bin` : 'ggml-large-v3-turbo-q5_0.bin')
+      const cpuModel = options.getCpuModel?.() || options.cpuModel
+      const cpu = find('cpu', cpuModel && cpuModel !== 'large-v3-turbo' ? `ggml-${cpuModel}-q5_1.bin` : 'ggml-large-v3-turbo-q5_0.bin')
       const cuda = find('cuda', 'ggml-large-v3-turbo-q5_0.bin')
       const useCuda = options.mode !== 'cpu' && cuda && (!options.gpuAvailable || await options.gpuAvailable())
       if (closed || generation !== current) throw new Error('Локальное распознавание остановлено')
       const candidates = [useCuda && cuda, cpu].filter(Boolean)
-      if (!candidates.length) throw new Error('Локальная модель речи не установлена. Переустанови версию с локальным распознаванием.')
+      if (!candidates.length) throw new Error('Локальная модель речи не установлена. Открой настройки и скачай выбранную модель.')
       for (const candidate of candidates) {
         try { await launch(candidate, current); return }
         catch (error) {
@@ -237,7 +241,9 @@ function createLocalStt(directory, bundledRoot, options = {}) {
   }
   function stop() { closed = true; release() }
   return { start, warmup, transcribe, release, stop, status: () => ({ running: Boolean(child), backend: runtime?.backend || null, pid: child?.pid || null,
-    cudaInstalled: Boolean(find('cuda', 'ggml-large-v3-turbo-q5_0.bin')),
+    cpuModel: options.getCpuModel?.() || options.cpuModel || 'large-v3-turbo',
+    installedModels: ['base', 'small', 'large-v3-turbo'].filter(model => Boolean(find('cpu', model === 'large-v3-turbo' ? 'ggml-large-v3-turbo-q5_0.bin' : `ggml-${model}-q5_1.bin`))),
+    cudaInstalled: Boolean(engine('cuda')),
     gpuSupported: ['nvidia-smi.exe', 'nvapi64.dll'].some(name => fs.existsSync(path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', name))),
   }) }
 }

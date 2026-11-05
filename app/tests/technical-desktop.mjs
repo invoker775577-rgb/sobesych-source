@@ -79,7 +79,7 @@ try {
   const material = join(directory, 'synthetic-context.md')
   writeFileSync(material, 'RAG evaluation fixture. REFERENCE_ANCHOR_CONTEXT.\n\nUnrelated recipe note.')
   await page.getByLabel('Загрузить материалы').setInputFiles(material)
-  await page.getByText(/synthetic-context.md ·/).waitFor()
+  await page.locator('.context-document > summary').filter({ hasText: /synthetic-context.md ·/ }).waitFor()
   await page.getByRole('button', { name: 'Сохранить', exact: true }).click()
   await page.getByText('Настройки сохранены', { exact: true }).waitFor()
   assert.equal(readFileSync(join(directory, 'context-library.enc')).includes(Buffer.from('REFERENCE_ANCHOR_CONTEXT')), false)

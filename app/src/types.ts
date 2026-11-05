@@ -1,15 +1,18 @@
 export type Speaker = 'interviewer' | 'me' | 'assistant' | 'note'
-export type Message = { id: string; speaker: Speaker; text: string; createdAt: string; origin?: 'manual' }
+export type Message = { id: string; speaker: Speaker; text: string; createdAt: string; origin?: 'manual'; taskBoundary?: boolean }
 import type { UsageRecord } from './usage.mjs'
 import { normalizeUsageRecord } from './usage.mjs'
 import { normalizePracticeScores } from './practice-score.mjs'
 export type PracticeScores = { accuracy: number; directness: number; specificity: number; naturalness: number }
 export type PracticeLibrary = { id: string; title: string; createdAt: string; sourceNames: string[]; sourceQuestionCounts: number[]; questions: string[]; questionSources: number[][]; unlabelledFileCount: number; emptyFileCount: number }
-export type Call = { id: string; createdAt: string; duration: number; messages: Message[]; kind?: 'call' | 'practice'; practiceProfile?: 'devops' | 'support'; practiceScores?: PracticeScores; practiceTrackId?: string; practiceTrackStep?: number; practiceQuestionSet?: { title: string; questions: string[] }; practiceReportComplete?: boolean; usage?: UsageRecord[]; usageTracking?: 'complete' | 'partial'; transcriptionMode?: 'local' | 'openrouter' }
+export type AnswerFeedback = 'incorrect' | 'complex' | 'brief'
+export const feedbackLabels = { incorrect: 'Ответ неверный', complex: 'Слишком сложно', brief: 'Мало деталей' } as const
+export type Call = { feedback?: Record<string, AnswerFeedback>; id: string; createdAt: string; duration: number; messages: Message[]; kind?: 'call' | 'practice'; practiceProfile?: 'devops' | 'support'; practiceScores?: PracticeScores; practiceTrackId?: string; practiceTrackStep?: number; practiceQuestionSet?: { title: string; questions: string[] }; practiceReportComplete?: boolean; usage?: UsageRecord[]; usageTracking?: 'complete' | 'partial'; transcriptionMode?: 'local' | 'openrouter' }
 export type SavedState = { calls: Call[] }
 export type ContextDocument = { id: string; title: string; text: string }
-export type Settings = { hasKey: boolean; baseUrl: string; model: string; codeModel: string; designModel: string; contextIds: string[]; language: string; microphoneId: string; practiceProfile: 'devops' | 'support'; autoAnswer: boolean; transcriptionMode: 'local' | 'openrouter'; transcriptionBaseUrl: string; transcriptionModel: string }
-export type LocalSpeech = { running: boolean; backend: 'cpu' | 'cuda' | null; cudaInstalled: boolean; gpuSupported: boolean }
+export type Settings = { hasKey: boolean; baseUrl: string; model: string; codeModel: string; designModel: string; fallbackModel: string; cpuSpeechModel: 'base' | 'small' | 'large-v3-turbo'; callBudgetUsd: number; contextIds: string[]; language: string; microphoneId: string; practiceProfile: 'devops' | 'support'; autoAnswer: boolean; transcriptionMode: 'local' | 'openrouter'; transcriptionBaseUrl: string; transcriptionModel: string }
+export type CallBudget = { limitUsd: number; accountedUsd: number; locked?: boolean }
+export type LocalSpeech = { cpuModel?: string; installedModels?: string[]; running: boolean; backend: 'cpu' | 'cuda' | null; cudaInstalled: boolean; gpuSupported: boolean }
 export type Model = { id: string; name: string; pricing?: { prompt: string; completion: string }; modalities?: string[]; context_length?: number }
 type Result = { error?: string; ok?: boolean }
 type UsageResult = { model?: string; usage?: Record<string, unknown> }
@@ -17,7 +20,7 @@ export type UpdateState = { phase: 'disabled' | 'idle' | 'checking' | 'available
 declare global {
   interface Window {
     sobesych?: {
-      getConfig(): Promise<Result & { settings: Settings; state: SavedState | null; settingsWarning?: string; contextDocuments?: ContextDocument[]; contextStatus?: { locked: boolean; warning: string }; practiceLibraries: PracticeLibrary[]; practiceLibrariesStatus: 'empty' | 'ready' | 'locked'; practiceLibrariesWarning?: string; historyWarning?: string; captureProtected?: boolean; overlayMode?: boolean; localSpeech?: LocalSpeech; practiceOnly: boolean; version: string }>
+      getConfig(): Promise<Result & { settings: Settings; state: SavedState | null; settingsWarning?: string; contextDocuments?: ContextDocument[]; contextStatus?: { locked: boolean; warning: string }; practiceLibraries: PracticeLibrary[]; practiceLibrariesStatus: 'empty' | 'ready' | 'locked'; practiceLibrariesWarning?: string; historyWarning?: string; captureProtected?: boolean; privacyEnabled?: boolean; captureExclusion?: boolean; overlayMode?: boolean; localSpeech?: LocalSpeech; practiceOnly: boolean; version: string }>
       getUpdateState(): Promise<UpdateState>
       checkUpdate(): Promise<UpdateState>
       downloadUpdate(): Promise<UpdateState>
@@ -30,7 +33,10 @@ declare global {
       savePracticeLibraries(value: PracticeLibrary[]): Promise<Result>
       saveContextDocuments(value: ContextDocument[]): Promise<Result & { documents?: ContextDocument[] }>
       exportDiagram(source: string): Promise<Result>
-      assist(value: { requestId: string; mode: string; messages: Message[]; presentation?: 'layered'; focus?: string; screenshot?: string; screenLanguage?: 'ru' | 'en'; partialQuestion?: boolean; maxTokens?: number; singleAttempt?: boolean }): Promise<Result & { answer?: string; usedContextIds?: string[]; answerKind?: string } & UsageResult>
+      exportDiagnostics(): Promise<Result>
+      installSpeechModel(model: string): Promise<Result>
+      getCallBudget(id: string): Promise<CallBudget & Result>
+      assist(value: { requestId: string; callId?: string; mode: string; messages: Message[]; presentation?: 'layered'; focus?: string; screenshot?: string; screenLanguage?: 'ru' | 'en'; partialQuestion?: boolean; maxTokens?: number; singleAttempt?: boolean }): Promise<Result & { answer?: string; requestedModel?: string; attempts?: string[]; budget?: CallBudget; usedContextIds?: string[]; answerKind?: string } & UsageResult>
       onAnswerDelta(callback: (event: { requestId: string; text: string }) => void): () => void
       transcribe(value: { audio: string; localOnly?: boolean; provisional?: boolean; source?: 'me' | 'interviewer'; requestId?: string; language?: 'auto' | 'ru' | 'en' }): Promise<Result & { text?: string } & UsageResult & { text?: string }>
       warmLocalTranscription(): Promise<Result & { previewEnabled?: boolean; backend?: 'cpu' | 'cuda' }>
@@ -45,7 +51,7 @@ declare global {
       selectScreenRegion(): Promise<Result & { screenshot?: string; width?: number; height?: number; screenLanguage?: 'ru' | 'en' }>
       setOverlayMode(enabled: boolean): Promise<Result & { enabled?: boolean }>
       onOverlayAction(callback: (event: { action: 'answer' | 'screen' }) => void): () => void
-      setCaptureProtection(enabled: boolean): Promise<Result & { enabled?: boolean; cancelled?: boolean }>
+      setCaptureProtection(enabled: boolean, excludeFromCapture?: boolean): Promise<Result & { enabled?: boolean; captureProtected?: boolean; captureExclusion?: boolean }>
       exportCall(value: Call): Promise<Result>
       openLogs(): Promise<Result>
       reportError(message: string): Promise<Result>
@@ -65,7 +71,7 @@ export function normalizeState(value: unknown): SavedState {
     const maxStep = validQuestionSet ? validQuestionSet.questions.length : validTrackId ? 32 : 0
     const validStep = typeof c.practiceTrackStep === 'number' && Number.isInteger(c.practiceTrackStep) && c.practiceTrackStep >= 0 && c.practiceTrackStep < maxStep
     return {
-      ...c, duration: Number.isFinite(c.duration) ? Math.max(0, c.duration) : 0,
+      ...c, feedback: Object.fromEntries(Object.entries(c.feedback || {}).filter(([id, reason]) => ['incorrect', 'complex', 'brief'].includes(reason) && c.messages.some(message => message.id === id && message.speaker === 'assistant')).slice(0, 1000)) as Record<string, AnswerFeedback>, duration: Number.isFinite(c.duration) ? Math.max(0, c.duration) : 0,
       usage: Array.isArray(c.usage) ? c.usage.map(normalizeUsageRecord).filter((record): record is UsageRecord => record !== undefined) : [],
       ...(c.usageTracking === 'complete' || c.usageTracking === 'partial' ? { usageTracking: c.usageTracking } : {}),
       ...(c.transcriptionMode === 'local' || c.transcriptionMode === 'openrouter' ? { transcriptionMode: c.transcriptionMode } : {}),

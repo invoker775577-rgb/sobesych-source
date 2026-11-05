@@ -1,11 +1,17 @@
 param(
   [string]$Target = (Join-Path $PSScriptRoot '..\vendor\local-stt-cpu'),
-  [ValidateSet('base', 'small', 'large-v3-turbo')][string]$Model = 'large-v3-turbo'
+  [ValidateSet('base', 'small', 'large-v3-turbo')][string]$Model = 'large-v3-turbo',
+  [switch]$ModelOnly,
+  [switch]$EngineOnly
 )
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+$windowsModules = Join-Path $PSHOME 'Modules'
+$env:PSModulePath = @($windowsModules, $env:PSModulePath, (Join-Path $env:ProgramFiles 'WindowsPowerShell\Modules')) -join ';'
+Import-Module Microsoft.PowerShell.Utility -ErrorAction Stop
 $Target = [IO.Path]::GetFullPath($Target)
+if ($ModelOnly -and $EngineOnly) { throw 'Choose only one component mode' }
 $release = Join-Path $Target 'cpu\Release'
 New-Item -ItemType Directory -Force -Path $release | Out-Null
 
@@ -21,6 +27,7 @@ function Download-Verified($url, $file, $hash) {
   }
 }
 
+if (!$ModelOnly) {
 $archivePath = Join-Path $Target 'whisper-cpu.zip'
 Download-Verified 'https://github.com/ggml-org/whisper.cpp/releases/download/v1.9.2/whisper-blas-bin-x64.zip' $archivePath 'FFE5B47CA8E53A7677949F23A9C4641BBEC4EEE8A5714C3D14B67BB8D7B24A78'
 Add-Type -AssemblyName System.IO.Compression.FileSystem
@@ -35,6 +42,8 @@ try {
   }
   if (!$names.ContainsKey('whisper-server.exe')) { throw 'CPU speech server is missing from archive' }
 } finally { $archive.Dispose() }
+}
+if ($EngineOnly) { Write-Output 'Verified CPU speech engine'; exit 0 }
 
 $hash = switch ($Model) {
   'base' { '422F1AE452ADE6F30A004D7E5C6A43195E4433BC370BF23FAC9CC591F01A8898' }

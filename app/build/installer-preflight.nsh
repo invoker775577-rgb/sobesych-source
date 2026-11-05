@@ -104,6 +104,29 @@ FunctionEnd
   Pop $2
 !macroend
 
+!macro SobesychPreserveModel SOURCE DESTINATION
+  ; Copy before uninstall, retaining the working source even if setup is canceled.
+  ${If} ${FileExists} "${SOURCE}\ggml-large-v3-turbo-q5_0.bin"
+  ${AndIfNot} ${FileExists} "${DESTINATION}\ggml-large-v3-turbo-q5_0.bin"
+    CreateDirectory "${DESTINATION}"
+    ClearErrors
+    CopyFiles /SILENT "${SOURCE}\ggml-large-v3-turbo-q5_0.bin" "${DESTINATION}\ggml-large-v3-turbo-q5_0.bin.copying"
+    ${If} ${Errors}
+      Delete "${DESTINATION}\ggml-large-v3-turbo-q5_0.bin.copying"
+      MessageBox MB_OK|MB_ICONSTOP "Sobesych could not preserve its speech model. Check free space and folder access. The installed application has not been removed." /SD IDOK
+      SetErrorLevel 76
+      Quit
+    ${EndIf}
+    ClearErrors
+    Rename "${DESTINATION}\ggml-large-v3-turbo-q5_0.bin.copying" "${DESTINATION}\ggml-large-v3-turbo-q5_0.bin"
+    ${If} ${Errors}
+      Delete "${DESTINATION}\ggml-large-v3-turbo-q5_0.bin.copying"
+      SetErrorLevel 76
+      Quit
+    ${EndIf}
+  ${EndIf}
+!macroend
+
 !macro customInit
   ; Both checks precede uninstallOldVersion. Never remove a working app first.
   CreateDirectory "$INSTDIR"
@@ -111,6 +134,7 @@ FunctionEnd
   !insertmacro SobesychCheckInstallSpace "$INSTDIR" 4294967296
   !ifdef APP_ID
     !if "${APP_ID}" == "local.sobesych.app"
+      !insertmacro SobesychPreserveModel "$INSTDIR\resources\local-stt" "$APPDATA\Sobesych\local-stt"
       !insertmacro SobesychPreserveGpu "$INSTDIR\resources\local-stt" "$APPDATA\Sobesych\local-stt"
     !endif
   !endif

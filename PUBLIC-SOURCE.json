@@ -1,5 +1,5 @@
 {
-  "applicationVersion": "0.5.85",
+  "applicationVersion": "0.5.86",
   "includesUnreleasedFixes": false,
   "hashNormalization": "UTF-8 text CRLF to LF; binary files unchanged",
   "exportPolicy": "Application source and synthetic tests only; no private Git history, profiles, recordings or evidence",
@@ -22,15 +22,15 @@
     },
     {
       "path": "app/build/installer-preflight.nsh",
-      "sha256": "18199d30d2a954cb56591ca3fd714836a05af985c879fab9d08424670b4d52cc"
+      "sha256": "910f66a2b1030a5bdf709ade0bf7f647cbba7be248b71f2739c12d95342bc51a"
     },
     {
       "path": "app/electron-builder.practice.yml",
-      "sha256": "577453eb4baa9f3b74e9566654c543fd1e61ab13406f9249b1e9d3b77ac012b3"
+      "sha256": "566ec50196b3041c670dd7fe9db3bbf1ccb3bd8c081fe7888d8000095c2c5f78"
     },
     {
       "path": "app/electron-builder.windows.yml",
-      "sha256": "f69b9600eacea295f88f51ada52abce7fe6425930cfe4669f4760b3b49c90bd4"
+      "sha256": "19173a924140ca04763f50066476debd46077018777ba84cde0fbe0795d36450"
     },
     {
       "path": "app/electron/answer-trace.cjs",
@@ -43,6 +43,10 @@
     {
       "path": "app/electron/context-store.cjs",
       "sha256": "f9d6ccacd2161abbfdd7c9f486c53dde56c49b88211d95e3e7d8c2ef9543c2eb"
+    },
+    {
+      "path": "app/electron/diagnostics.cjs",
+      "sha256": "4fa78318e8b553035a923524d83f70fd52db5e15ea97aa3a34840dee54d246f7"
     },
     {
       "path": "app/electron/licenses/CPYTHON.txt",
@@ -66,15 +70,15 @@
     },
     {
       "path": "app/electron/local-stt.cjs",
-      "sha256": "5f3e98249ab2d13a1ee5d2b2a591c3724eb716732a1aad663725f1695fcf6a7b"
+      "sha256": "67cd0282a38c96ef1446a3673d8942c779a220f06ef9038ba9101340a6825096"
     },
     {
       "path": "app/electron/main.cjs",
-      "sha256": "f0ed99f746cf1f0919e03844a8caa973087bb4c187595671d6253ca2d8960888"
+      "sha256": "cd4495d56624f31206e22d13e4785765b79b00ca92bdbaa4dd766eb381403448"
     },
     {
       "path": "app/electron/preload.cjs",
-      "sha256": "b12db6622dd20840464381f830da3a41a78c86431752be1621204725e76f66f9"
+      "sha256": "8215ad11e070934df7e76f5d7f47de1ff155072bf1374a2a71b535a27ba04240"
     },
     {
       "path": "app/electron/region-preload.cjs",
@@ -122,11 +126,11 @@
     },
     {
       "path": "app/package-lock.json",
-      "sha256": "0400954b6d47613874b1b6e09405aeaeb67adb251608ae9bdd1e7e4f8d9ff084"
+      "sha256": "0b22aaffd305e83c2dd1d353aa28313b6e8eb73b4e12090472bfc16617ef6f82"
     },
     {
       "path": "app/package.json",
-      "sha256": "5a75f1d53b650b6c98dcef1b32131a836954a03516a00a5f679644a624f5aa38"
+      "sha256": "093be5bcc2eda42288f5fe97e5e7f4383dc7355258ab41b2cc290836c22f3885"
     },
     {
       "path": "app/public/favicon.svg",
@@ -142,7 +146,7 @@
     },
     {
       "path": "app/scripts/install-cpu-stt.ps1",
-      "sha256": "c05295c27325a93c8d00f9af9e1b5df9192716f4ee43b39cca8ec275dcd49c87"
+      "sha256": "e9776efef3a9f88f06d717450e4f5574d81655b304ba54d8aea7524dd6409530"
     },
     {
       "path": "app/scripts/install-local-stt.ps1",
@@ -158,19 +162,19 @@
     },
     {
       "path": "app/scripts/verify-release.mjs",
-      "sha256": "bcc4d83f1884338136aa3865919fb34586d925f78a1b78e3e1268f4217c7555c"
+      "sha256": "952f7ac43fb750ad7442d8ddfbf8c72361e07c88db87459707ce8433897a7067"
     },
     {
       "path": "app/server.mjs",
-      "sha256": "4f769b3cc8a163c4f9d3dd4903b7c24d37dcc01e6405d6c76269ade267eac6bc"
+      "sha256": "f690d685dc59795e67119faa39dab4f3eefb0b2d216685dc8b62e8a3ecc0e555"
     },
     {
       "path": "app/src/App.css",
-      "sha256": "b6898614b16736506ed82a752fc69723cc947e0f6a8938e069554eeb2c543a57"
+      "sha256": "a96ea863a834d83981345ec5eee27688db754cf7666a8a9fb1cb18653d126bfb"
     },
     {
       "path": "app/src/App.tsx",
-      "sha256": "67f6d660d0901482fb98d471448ea0957685c1af5655a5429fe0b4cf65457516"
+      "sha256": "4b7401e5089579f754e3cf3e7dc3a0bf800c4532c80fedffea607bb39af1c9ba"
     },
     {
       "path": "app/src/assets/hero.png",
@@ -193,6 +197,14 @@
       "sha256": "0f0436732b1d4f6967fa933c33a6b61d90e2b7939f6a5e1221517295219e797d"
     },
     {
+      "path": "app/src/call-budget.mjs",
+      "sha256": "c675e311be52c9f10f4dc182cf23c990bfd250b913dd13f711ea2d6815dbd807"
+    },
+    {
+      "path": "app/src/CallReview.tsx",
+      "sha256": "4603f9108520989faaf3adce266994f98e5bf98cc1ed587d1a2197b5ad56835b"
+    },
+    {
       "path": "app/src/capture.ts",
       "sha256": "cfae411601ceb48c9e292d1506b7d974a4229128db4ddc057765419c9c7b3aed"
     },
@@ -202,15 +214,15 @@
     },
     {
       "path": "app/src/ContextPanel.tsx",
-      "sha256": "bbd5b4b99b1096f9df19b206bf4df7b69e28f72d933dd04f6012527706601e78"
+      "sha256": "5e65d123e34301d6517ae9a66da230889e7991c3fbb28349fe8993425c02975a"
     },
     {
       "path": "app/src/copilot.d.mts",
-      "sha256": "f081046ac4041e303c5290409c03c320cd73bbf30d941f2fc66b6992b5c2ca3a"
+      "sha256": "690b74a666aa93c1f95255b8beedff446d6117bef13ecf24bc4d83568a72d386"
     },
     {
       "path": "app/src/copilot.mjs",
-      "sha256": "f3a9c8e833a19f148fbfea776ac5f09159d0c3511d6979784fb45bccdbd987f0"
+      "sha256": "3e8dc6588109735ca905fb0b36389397e9560ae3175012f6ccb35d48a403a30d"
     },
     {
       "path": "app/src/diagram.d.mts",
@@ -222,7 +234,7 @@
     },
     {
       "path": "app/src/domain-knowledge.mjs",
-      "sha256": "6c2cd37c56a934ee9ba840f0313c4807e26fdcadcd1a5a7779f3ba850b6b1490"
+      "sha256": "ef76dd74984308e94020e29366ab6dbbdb5926a4383a2e626fdf4105cca5555e"
     },
     {
       "path": "app/src/index.css",
@@ -234,7 +246,7 @@
     },
     {
       "path": "app/src/ModelProfiles.tsx",
-      "sha256": "647a7a95db5274c73750ef0c9be70937feccce5f591ab36185ed3570108e95f6"
+      "sha256": "900466ee7b5a59a2097a72d3d0bc4b20d6e5eb79125b9a4817a71c57ff6130dc"
     },
     {
       "path": "app/src/pcm-worklet.js",
@@ -277,6 +289,10 @@
       "sha256": "fcc70379553243912265edb1a666acbf9e2c70573d06699a92481cf916317b9e"
     },
     {
+      "path": "app/src/ReadinessPanel.tsx",
+      "sha256": "5d04d766ec912d577b7d8f99a526b4ac3a8e10e1b9f43b545da59e3edb78d4e9"
+    },
+    {
       "path": "app/src/screen-task.d.mts",
       "sha256": "34be4d59aea3c637895b3cccf35b8d9ff9389b735be804bd01fc749becebe818"
     },
@@ -306,7 +322,7 @@
     },
     {
       "path": "app/src/types.ts",
-      "sha256": "af3e55b79290c7c0c0c4cb64b19f2e84d22611c3eaa7cc3001d9f4f6f5111ad7"
+      "sha256": "b7714e34a7c218151d8c9c488d849777ae64d4fed14bcc6663a1d9034f697c7b"
     },
     {
       "path": "app/src/UpdatePanel.tsx",
@@ -331,6 +347,10 @@
     {
       "path": "app/tests/answer-controls.mjs",
       "sha256": "954a2202ac3b72c92a0268c89910a36c4f3c09cfe90ed57a8a453350ce53a477"
+    },
+    {
+      "path": "app/tests/call-upgrade.test.mjs",
+      "sha256": "a65ea918fa2b6d6aa02a358a3d849b0674c80718d67822d42e58c72526c2fc0b"
     },
     {
       "path": "app/tests/capture.test.mjs",
@@ -373,8 +393,16 @@
       "sha256": "a3dce8264f523c8fac2876593c71e995e4749180d90f6d30d06d2be8c96f144a"
     },
     {
+      "path": "app/tests/recording-compatibility.mjs",
+      "sha256": "140ab6b498d903075f2a184554d05d8e2fc808fd5318731a7f15348a75e3579e"
+    },
+    {
+      "path": "app/tests/region-ready.mjs",
+      "sha256": "05e1315d81d69843976e45df991fc8f1d8b2f376009f4f123b3769bbc41f45cf"
+    },
+    {
       "path": "app/tests/release-config.test.mjs",
-      "sha256": "9278d86849c3553083f3ba21a51ca6fceaf0364be0d59b12c450a5489f8ce861"
+      "sha256": "e1f164d08a4fe83f925a2d272e8eb306116c43ab47363c6de5f0b4e516b9d328"
     },
     {
       "path": "app/tests/release-source.test.mjs",
@@ -386,11 +414,11 @@
     },
     {
       "path": "app/tests/rollback.test.mjs",
-      "sha256": "badfe6df9954a4d40234b3736b7269a2d92828b3245a577a21e08db6e01c5ad8"
+      "sha256": "a549b688b28de517c396649a0bdd295e5b026756829a1f3ac940aabbcd5e9820"
     },
     {
       "path": "app/tests/technical-desktop.mjs",
-      "sha256": "3365b90f79d28a299caa710ffa9ccaf2edc5b37c2414c6e1bdb3b244e615ed07"
+      "sha256": "853058f5bc20d3701b72bdc4de3bf5f3a49d67874d0d2be3bf2b39c69772d9a0"
     },
     {
       "path": "app/tests/technical-runtime.mjs",
@@ -434,7 +462,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "c31a9e0277b9430f72e0dde4e3bd615299f89fc9385e9b073032b6af1bf0e562"
+      "sha256": "d8f0bfa32b3aa903ad8f4f0e0fdde29f953dabc071f8d5c7769c6eb29531aff1"
     },
     {
       "path": "SECURITY.md",

@@ -2,7 +2,7 @@
   "name": "sobesych",
   "license": "MIT",
   "private": true,
-  "version": "0.5.85",
+  "version": "0.5.86",
   "productName": "Sobesych",
   "type": "module",
   "main": "electron/main.cjs",
@@ -18,14 +18,16 @@
     "build:practice": "tsc -b && vite build --mode practice",
     "prepare:local-stt": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/install-cpu-stt.ps1",
     "prepare:local-stt:gpu": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/install-local-stt.ps1",
+    "prepare:local-stt:engine": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/install-cpu-stt.ps1 -EngineOnly",
     "lint": "oxlint",
     "preview": "vite preview",
-    "test": "node --test tests/copilot.test.mjs tests/generic-answers.test.mjs tests/capture.test.mjs tests/local-stt.test.mjs tests/practice-bank.test.mjs tests/practice-import.test.mjs tests/practice-voice.test.mjs tests/release-config.test.mjs tests/usage.test.mjs tests/updates.test.mjs tests/clean-releases.test.mjs tests/release-source.test.mjs tests/rollback.test.mjs",
+    "test": "node --test tests/copilot.test.mjs tests/call-upgrade.test.mjs tests/generic-answers.test.mjs tests/capture.test.mjs tests/local-stt.test.mjs tests/practice-bank.test.mjs tests/practice-import.test.mjs tests/practice-voice.test.mjs tests/release-config.test.mjs tests/usage.test.mjs tests/updates.test.mjs tests/clean-releases.test.mjs tests/release-source.test.mjs tests/rollback.test.mjs",
     "test:controls": "npm run build && node tests/answer-controls.mjs",
     "test:technical": "npm run build && node tests/technical-runtime.mjs && node tests/technical-desktop.mjs",
+    "test:recording": "npm run build && node tests/recording-compatibility.mjs",
     "test:local-stt:regression": "node tests/local-stt-regression.mjs",
     "dist:win": "npm run prepare:local-stt && npm run lint && npm test && npm run build && electron-builder --win portable --x64 --publish never",
-    "dist:setup:win": "npm run prepare:local-stt && npm run lint && npm test && npm run build && electron-builder --config electron-builder.windows.yml --win nsis --x64 --publish never && node scripts/verify-release.mjs release-installer/win-unpacked",
+    "dist:setup:win": "npm run prepare:local-stt:engine && npm run lint && npm test && npm run build && electron-builder --config electron-builder.windows.yml --win nsis --x64 --publish never && node scripts/verify-release.mjs release-installer/win-unpacked",
     "dist:practice:win": "npm run prepare:local-stt:gpu && npm run lint && npm test && npm run build:practice && electron-builder --config electron-builder.practice.yml --win nsis --x64 --publish never"
   },
   "build": {
@@ -46,6 +48,8 @@
       "server.mjs",
       "package.json",
       "node_modules/**",
+      "src/call-budget.mjs",
+      "scripts/install-cpu-stt.ps1",
       "LICENSE"
     ],
     "extraResources": [
@@ -61,7 +65,8 @@
     ],
     "asarUnpack": [
       "electron/screen-language.ps1",
-      "scripts/install-local-stt.ps1"
+      "scripts/install-local-stt.ps1",
+      "scripts/install-cpu-stt.ps1"
     ],
     "electronLanguages": [
       "en-US",

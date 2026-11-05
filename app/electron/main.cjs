@@ -8,6 +8,7 @@ const { spawn } = require('node:child_process')
 const { createStore } = require('./store.cjs')
 const { createContextStore } = require('./context-store.cjs')
 const { formatAnswerTrace } = require('./answer-trace.cjs')
+const { diagnosticSnapshot } = require('./diagnostics.cjs')
 const { createUpdates, createWindowsUpdater } = require('./updates.cjs')
 const { createLocalStt, shouldUseLocalTranscription, formatTranscriptionTrace } = require('./local-stt.cjs')
 const { isValidRegion, mapRegionToImage } = require('./screen-region.cjs')
@@ -29,10 +30,13 @@ let updates
 let updateBusy = false
 let updateCheckTimer
 let overlayMode = false
+let privacyEnabled = false
+let captureExclusion = false
 let normalBounds = null
 let normalMaximized = false
 let screenCaptureBusy = false
 const requests = new Map()
+const answerEvents = []
 const closing = new AbortController()
 function log(stage, message) {
   const file = path.join(directory, 'sobesych.log')
@@ -83,7 +87,7 @@ function handle(channel, callback) {
     try { return await callback(payload) }
     catch (error) {
       log(channel, error.message)
-      return { error: error.message, ...(error.model ? { model: error.model } : {}), ...(error.usage ? { usage: error.usage } : {}) }
+      return { error: error.message, ...(error.model ? { model: error.model } : {}), ...(error.usage ? { usage: error.usage } : {}), ...(error.budget ? { budget: error.budget } : {}) }
     }
   })
 }
@@ -157,7 +161,14 @@ else {
     const env = loadRuntimeEnv()
     store = createStore(directory, safeStorage, { apiKey: env.OPENAI_API_KEY || env.OPENROUTER_API_KEY || '', baseUrl: env.OPENAI_BASE_URL, model: env.OPENAI_MODEL }, resolveSettings)
     const contextStore = createContextStore(directory, safeStorage)
-    const service = createService({ getSettings: store.getSettings, getContextDocuments: () => contextStore.forRequest(store.getSettings().contextIds) })
+    const { createCallBudget } = await import('../src/call-budget.mjs')
+    const budgetFile = path.join(directory, 'call-budget.json')
+    const budgetLedger = createCallBudget({
+      load: () => fs.existsSync(budgetFile) ? JSON.parse(fs.readFileSync(budgetFile, 'utf8')) : {},
+      save: value => { const temporary = `${budgetFile}.tmp`; fs.writeFileSync(temporary, JSON.stringify(value), { mode: 0o600 }); fs.renameSync(temporary, budgetFile) },
+    })
+    const service = createService({ getSettings: store.getSettings, getContextDocuments: () => contextStore.forRequest(store.getSettings().contextIds), budgetLedger })
+    handle('budget:status', id => service.budgetStatus(typeof id === 'string' ? id : ''))
     const updateEnabled = app.isPackaged && process.platform === 'win32' && !process.env.PORTABLE_EXECUTABLE_FILE &&
       fs.existsSync(path.join(path.dirname(process.execPath), `Uninstall ${app.getName()}.exe`)) &&
       fs.existsSync(path.join(process.resourcesPath, 'app-update.yml'))
@@ -174,7 +185,7 @@ else {
     handle('update:install', () => updates.install())
     handle('update:busy', value => { updateBusy = value === true; return { ok: true } })
     const bundledStt = app.isPackaged ? path.join(process.resourcesPath, 'local-stt') : path.join(__dirname, '..', 'vendor', 'local-stt')
-    localStt = createLocalStt(directory, bundledStt, { cpuRoot: app.isPackaged ? undefined : path.join(__dirname, '..', 'vendor', 'local-stt-cpu') })
+    localStt = createLocalStt(directory, bundledStt, { cpuRoot: app.isPackaged ? undefined : path.join(__dirname, '..', 'vendor', 'local-stt-cpu'), getCpuModel: () => store.getSettings().cpuSpeechModel })
     const permitted = (contents, permission) => contents === mainWindow?.webContents && (permission === 'media' || (!practiceOnlyBuild && permission === 'display-capture'))
     session.defaultSession.setPermissionRequestHandler((contents, permission, callback) => callback(permitted(contents, permission)))
     session.defaultSession.setPermissionCheckHandler(permitted)
@@ -189,9 +200,10 @@ else {
     })
     handle('app:config', () => {
       const { pid: _pid, ...localSpeech } = localStt.status()
-      return { settings: store.publicConfig(), state: store.loadState(), settingsWarning: store.settingsWarning(), contextDocuments: contextStore.list(), contextStatus: contextStore.status(), practiceLibraries: store.getPracticeLibraries(), practiceLibrariesStatus: store.practiceLibrariesStatus(), practiceLibrariesWarning: store.practiceLibrariesWarning(), historyWarning: store.historyWarning(), captureProtected: mainWindow.isContentProtected(), overlayMode, localSpeech, practiceOnly: practiceOnlyBuild, version: app.getVersion() }
+      return { settings: store.publicConfig(), state: store.loadState(), settingsWarning: store.settingsWarning(), contextDocuments: contextStore.list(), contextStatus: contextStore.status(), practiceLibraries: store.getPracticeLibraries(), practiceLibrariesStatus: store.practiceLibrariesStatus(), practiceLibrariesWarning: store.practiceLibrariesWarning(), historyWarning: store.historyWarning(), captureProtected: mainWindow.isContentProtected(), privacyEnabled, captureExclusion, overlayMode, localSpeech, practiceOnly: practiceOnlyBuild, version: app.getVersion() }
     })
     handle('settings:save', update => {
+      if (update?.cpuSpeechModel && update.cpuSpeechModel !== store.getSettings().cpuSpeechModel && localStt.status().running) throw new Error('Перед сменой модели речи останови звонок или проверку звука')
       const settings = store.saveSettings(update)
       return { settings }
     })
@@ -223,6 +235,18 @@ else {
     handle('local-stt:warm', () => warmLocalStt())
     handle('local-stt:release', () => { localStt.release(); return { ok: true } })
     handle('local-stt:gpu-cancel', () => { gpuInstaller?.kill(); return { ok: true } })
+    handle('local-stt:model-install', async model => {
+      if (!['base', 'small', 'large-v3-turbo'].includes(model)) throw new Error('Неизвестная модель речи')
+      if (gpuInstaller || updateBusy || requests.size || localStt.status().running) throw new Error('Сначала останови звонок и проверку звука')
+      const script = app.isPackaged ? path.join(process.resourcesPath, 'app.asar.unpacked', 'scripts', 'install-cpu-stt.ps1') : path.join(__dirname, '..', 'scripts', 'install-cpu-stt.ps1')
+      const executable = path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe')
+      return new Promise(resolve => {
+        const helper = spawn(executable, ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', script, '-Target', path.join(directory, 'local-stt'), '-Model', model, '-ModelOnly'], { windowsHide: true, stdio: 'ignore' })
+        gpuInstaller = helper
+        const finish = code => { if (gpuInstaller !== helper) return; gpuInstaller = null; resolve(code === 0 ? { ok: true } : { error: 'Загрузка модели прервана. Проверь сеть и свободное место; можно повторить.' }) }
+        helper.once('exit', finish); helper.once('error', () => finish(-1))
+      })
+    })
     handle('local-stt:gpu-install', async () => {
       if (gpuInstaller || updateBusy || requests.size || localStt.status().running) throw new Error('Сначала останови звонок и проверку звука')
       if (!localStt.status().gpuSupported) throw new Error('Для GPU-пакета нужен установленный драйвер NVIDIA')
@@ -262,11 +286,19 @@ else {
       }
       finally { requests.delete(id) }
     })
-    handle('privacy:set', enabled => {
+    handle('privacy:set', payload => {
       if (practiceOnlyBuild) throw new Error('Скрытый режим отсутствует в тренировочной версии')
+      const { enabled, excludeFromCapture = captureExclusion } = payload || {}
       if (typeof enabled !== 'boolean') throw new Error('Состояние защиты должно быть true или false')
-      if (mainWindow.isContentProtected() !== enabled) mainWindow.setContentProtection(enabled)
-      return { ok: true, enabled: mainWindow.isContentProtected() }
+      if (typeof excludeFromCapture !== 'boolean') throw new Error('Исключение из записи должно быть true или false')
+      // Windows capture exclusion can stop NVIDIA desktop recording entirely.
+      // The eye button hides the taskbar entry; exclusion needs separate opt-in.
+      const protect = enabled && excludeFromCapture
+      if (mainWindow.isContentProtected() !== protect) mainWindow.setContentProtection(protect)
+      mainWindow.setSkipTaskbar(enabled)
+      privacyEnabled = enabled
+      captureExclusion = excludeFromCapture
+      return { ok: true, enabled: privacyEnabled, captureProtected: mainWindow.isContentProtected(), captureExclusion }
     })
     handle('overlay:set', enabled => {
       if (practiceOnlyBuild) throw new Error('Оверлей отсутствует в тренировочной версии')
@@ -345,7 +377,14 @@ else {
       return { ok: !result.canceled }
     })
     handle('app:logs', async () => { const error = await shell.openPath(directory); if (error) throw new Error(error); return { ok: true } })
-    handle('answer:trace', value => { const trace = formatAnswerTrace(value); if (trace) log('answer-flow', trace); return { ok: true } })
+    handle('answer:trace', value => { const trace = formatAnswerTrace(value); if (trace) { log('answer-flow', trace); answerEvents.push(JSON.parse(trace)); if (answerEvents.length > 100) answerEvents.shift() } return { ok: true } })
+    handle('diagnostics:export', async () => {
+      const snapshot = diagnosticSnapshot({ version: app.getVersion(), platform: process.platform, arch: process.arch, speech: localStt.status(), settings: store.publicConfig(), events: answerEvents })
+      const result = await dialog.showSaveDialog(mainWindow, { defaultPath: `Sobesych-diagnostics-${app.getVersion()}.json`, filters: [{ name: 'JSON', extensions: ['json'] }] })
+      if (result.canceled || !result.filePath) return { ok: true }
+      fs.writeFileSync(result.filePath, JSON.stringify(snapshot, null, 2), 'utf8')
+      return { ok: true }
+    })
     handle('app:error', message => { log('renderer-error', String(message).slice(0, 2000)); return { ok: true } })
     createWindow()
     if (updateEnabled && !process.env.SOBESYCH_HEADLESS) {

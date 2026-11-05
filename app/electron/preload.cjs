@@ -16,8 +16,11 @@ contextBridge.exposeInMainWorld('sobesych', {
   savePracticeLibraries: value => ipcRenderer.invoke('practice-libraries:save', value),
   saveContextDocuments: value => ipcRenderer.invoke('context:save', value),
   exportDiagram: source => ipcRenderer.invoke('diagram:export', source),
-  setCaptureProtection: enabled => ipcRenderer.invoke('privacy:set', enabled),
+  setCaptureProtection: (enabled, excludeFromCapture) => ipcRenderer.invoke('privacy:set', { enabled, excludeFromCapture }),
   assist: value => ipcRenderer.invoke('provider:assist', value),
+  getCallBudget: id => ipcRenderer.invoke('budget:status', id),
+  exportDiagnostics: () => ipcRenderer.invoke('diagnostics:export'),
+  installSpeechModel: model => ipcRenderer.invoke('local-stt:model-install', model),
   traceAnswer: value => ipcRenderer.invoke('answer:trace', value),
   onAnswerDelta: callback => {
     const listener = (_event, value) => callback(value)

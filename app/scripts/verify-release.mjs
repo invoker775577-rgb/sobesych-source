@@ -26,7 +26,7 @@ const privateFiles = names.filter(name => !name.startsWith('node_modules/') && /
 assert.deepEqual(privateFiles, [], 'User data or development fixtures must not be shipped')
 
 assert.notEqual(packageInfo.practiceOnly, true, 'Main-channel updates must preserve call functionality')
-for (const name of ['src/transcript.mjs', 'src/copilot.mjs', 'src/diagram.mjs', 'src/domain-knowledge.mjs', 'src/practice-score.mjs', 'dist/index.html', 'dist/runtimes/python/pyodide.asm.wasm', 'dist/runtimes/python/python_stdlib.zip', 'dist/runtimes/sql/sql-wasm.wasm']) assert.ok(names.includes(name), `Missing runtime module: ${name}`)
+for (const name of ['src/transcript.mjs', 'src/copilot.mjs', 'src/call-budget.mjs', 'src/diagram.mjs', 'src/domain-knowledge.mjs', 'src/practice-score.mjs', 'dist/index.html', 'dist/runtimes/python/pyodide.asm.wasm', 'dist/runtimes/python/python_stdlib.zip', 'dist/runtimes/sql/sql-wasm.wasm']) assert.ok(names.includes(name), `Missing runtime module: ${name}`)
 assert.ok(!names.includes('dist-practice/index.html'), 'Practice-only UI must not replace the main call application')
 const sourceFiles = names.filter(name => name === 'server.mjs' || name.startsWith('src/') || name.startsWith('dist/') || name.startsWith('electron/'))
 let checkedSources = 0
@@ -53,7 +53,13 @@ async function hash(path, algorithm = 'sha256', encoding = 'hex') {
 }
 const model = join(directory, 'resources', 'local-stt', 'ggml-large-v3-turbo-q5_0.bin')
 assert.ok(readFileSync(join(directory, 'resources', 'app.asar.unpacked', 'electron', 'screen-language.ps1')).equals(readFileSync('electron/screen-language.ps1')), 'Missing or stale external OCR script')
-assert.equal(await hash(model), '394221709cd5ad1f40c46e6031ca61bce88931e6e088c188294c6d5a55ffa7e2')
+if (packageInfo.speechModelBundled === false) {
+  assert.equal(existsSync(model), false, 'Thin installer must not duplicate the speech model')
+  const downloader = readFileSync(join(directory, 'resources', 'app.asar.unpacked', 'scripts', 'install-cpu-stt.ps1'), 'utf8')
+  assert.match(downloader, /394221709CD5AD1F40C46E6031CA61BCE88931E6E088C188294C6D5A55FFA7E2/)
+  assert.match(downloader, /5359861c739e955e79d9a303bcbc70fb988958b1/)
+  assert.ok(sameTextSource(Buffer.from(downloader), readFileSync('scripts/install-cpu-stt.ps1')))
+} else assert.equal(await hash(model), '394221709cd5ad1f40c46e6031ca61bce88931e6e088c188294c6d5a55ffa7e2')
 for (const file of ['whisper-server.exe', 'whisper.dll', 'ggml.dll', 'ggml-base.dll', 'ggml-blas.dll', 'libopenblas.dll', 'ggml-cpu-x64.dll']) {
   assert.ok(existsSync(join(directory, 'resources', 'local-stt', 'cpu', 'Release', file)), `Missing bundled speech component: ${file}`)
 }

@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ContextDocument } from './types'
+import { selectContextPassages } from './copilot.mjs'
 
 export function ContextPanel({ documents, selected, onChange, onSelected, onLoading, locked, warning, disabled }: { documents: ContextDocument[]; selected: string[]; onChange: (value: ContextDocument[]) => void; onSelected: (ids: string[]) => void; onLoading: (loading: boolean) => void; locked: boolean; warning: string; disabled: boolean }) {
   const [loading, setLoading] = useState(false); const [error, setError] = useState('')
+  const [previewQuestion, setPreviewQuestion] = useState('')
   const mounted = useRef(true)
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; onLoading(false) } }, [onLoading])
   const characters = documents.reduce((total, doc) => total + doc.text.length, 0)
@@ -31,6 +33,7 @@ export function ContextPanel({ documents, selected, onChange, onSelected, onLoad
       <label>Текст материала<textarea aria-label={`Текст ${doc.title}`} value={doc.text} maxLength={20000} disabled={disabled || locked} onChange={event => onChange(documents.map(item => item.id === doc.id ? { ...item, text: event.target.value } : item))} /></label>
       <button type="button" disabled={disabled || locked} onClick={() => { onChange(documents.filter(item => item.id !== doc.id)); onSelected(selected.filter(id => id !== doc.id)) }}>Удалить материал</button>
     </details>)}</fieldset>
+    {selected.length > 0 && <details><summary>Какие фрагменты получит модель</summary><label>Пробный вопрос<input value={previewQuestion} onChange={event => setPreviewQuestion(event.target.value)} placeholder="Можно на русском или английском" /></label><small>Локальный подбор без API. Если совпадений нет, передаются ограниченные выдержки выбранных документов. Для снимка передаются все явно выбранные материалы до 20 000 символов.</small>{selectContextPassages(documents, selected, previewQuestion).map((part, index) => <details key={`${part.id}-${index}`}><summary>{part.title} · {part.text.length} символов</summary><pre>{part.text}</pre></details>)}</details>}
     {error && <p role="alert">{error}</p>}<small>Материалы и их выбор применятся после сохранения настроек. Новые файлы не загружаются автоматически.</small>
   </section>
 }

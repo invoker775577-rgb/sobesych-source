@@ -1,5 +1,28 @@
 const TOPICS = [
   {
+    id: 'ai-evidence',
+    // https://sbert.net/docs/sentence_transformer/usage/semantic_textual_similarity.html
+    // https://cloud.google.com/vertex-ai/generative-ai/docs/models/evaluation-overview
+    match: /\b(?:RAG|retriev\w*|embedding\w*|cosine|chatbot)\b|чат.?бот|эмбеддинг|косинус/iu,
+    guidance: ['Сходство обученных эмбеддингов отражает близость смысла, а не только общие слова, но не доказывает истинность или совпадение фактов. Правильный ID документа не доказывает, что выбран правильный фрагмент или версия. Проверяют конкретный текст в контексте и опору ответа на него. Лайки измеряют восприятие и могут быть смещены; качество оценивают на независимых задачах с проверкой фактов, решения задачи и человеческим разбором. Один положительный показатель не доказывает улучшение.'],
+    english: ['Learned embeddings encode approximate semantic relatedness, not only word overlap; similarity is not truth or factual equivalence. A correct document ID does not prove that the retrieved passage or version contains the answer. Inspect the exact context and whether it supports the generated claim. Thumbs-up feedback is a biased perception signal, not proof of correctness or task success. Compare held-out representative tasks, factual support, task outcomes and human review; do not conclude improvement from clicks alone.'],
+  },
+  {
+    id: 'jwt-claims',
+    // https://www.rfc-editor.org/rfc/rfc8725
+    match: /\b(?:JWT|JWS|JWE)\b/iu,
+    exclude: /\b(?:Vault|GitLab)\b/iu,
+    guidance: ['Подпись JWS не шифрует payload; его можно прочитать. Подпись проверяют доверенным ключом с проверкой допустимого алгоритма, срока и нужных issuer/audience. Существуют симметричные и асимметричные алгоритмы. JWT может быть зашифрован как JWE, но пароли в токены включать не нужно. Не предлагай JWE как оправдание хранения пользовательского пароля в токене.'],
+    english: ['A JWS signature does not encrypt its payload. Validate the signature, allowed algorithm, expiry and required issuer/audience. Signing can use symmetric or asymmetric algorithms; it is not always hashing with a shared secret. A JWT can be encrypted as JWE, but passwords should not be put in tokens; do not recommend JWE as justification for carrying passwords.'],
+  },
+  {
+    id: 'deduplicated-side-effects',
+    // https://www.rabbitmq.com/docs/reliability
+    match: /idempotenc\w*|идемпотент\p{L}*|(?:double|duplicate)\s+payment|before\s+ack/iu,
+    guidance: ['Проверка «есть ли запись», а затем отдельное действие не атомарны и могут гоняться. Дедупликация использует один ID на логическую операцию и атомарную запись с уникальным ограничением. Для внешнего списания нужна поддержка идемпотентности платёжным провайдером; одна запись в нашей БД не гарантирует однократный внешний эффект. Подтверждать сообщение нужно после фиксации обработки.'],
+    english: ['A separate check-then-act sequence races under concurrent workers. Reuse one ID for the same logical operation and atomically record deduplication with the local state change. An external charge also needs provider-side idempotency; a local unique row alone cannot guarantee one external charge. Acknowledge after durable processing. Do not promise global exactly-once effects.'],
+  },
+  {
     id: 'async-execution',
     match: /асинхрон\p{L}*|\b(?:async|asynchronous|asynchrony)\b/iu,
     // https://docs.python.org/3/library/asyncio-task.html
@@ -144,7 +167,7 @@ const TOPICS = [
   {
     id: 'terraform-rollback',
     match: /(terraform|терраформ|тераформ|треформ)/i,
-    requireAny: [/(откат|открат|rollback|roll back|неудачн|failed deployment)/i],
+    requireAny: [/(откат|открат|roll\w* back|rollback|неудачн|failed deployment|apply failed|old state|state file)/i],
     guidance: [
       'После неудачного Terraform apply сначала выяснить, какие ресурсы реально изменились, и проверить состояние сервиса и state. Не считать откат state откатом инфраструктуры.',
       'Взять предыдущую рабочую версию конфигурации из Git, сделать terraform plan с ней и внимательно проверить diff, особенно удаление ресурсов и данные. State обычно хранится отдельно от Git; не утверждать, что предыдущий state можно взять из Git. Согласовать план с командой и только затем apply.',
@@ -154,6 +177,7 @@ const TOPICS = [
       'After a failed Terraform apply, inspect what changed in the real infrastructure and check the service and state. Reverting state alone does not revert infrastructure.',
       'Use the previous known-good configuration from Git to make a fresh plan. Terraform state is usually stored separately, not in Git. Review the diff, especially destroys and data changes, coordinate with the team, then apply the reviewed plan.',
       'A partial apply may need resource-by-resource recovery. Do not blindly reuse an old plan or force-unlock a lock you have not checked.',
+      'State maps configured resources to real object IDs. Restoring older state is not an undo. An object missing from state is not automatically deleted; it can become unmanaged or conflict with a planned creation. Keep a state backup and inspect a fresh plan. Do not recommend blind destroy or store sensitive state in Git.',
     ],
   },
   {
@@ -496,7 +520,7 @@ const TOPICS = [
 ]
 
 function matchesTopic(topic, text) {
-  if (!topic.match.test(text)) return false
+  if (!topic.match.test(text) || topic.exclude?.test(text)) return false
   return (!topic.requireAny || topic.requireAny.some(pattern => pattern.test(text)))
     && (!topic.requireAll || topic.requireAll.every(pattern => pattern.test(text)))
 }
