@@ -1,5 +1,13 @@
 const TOPICS = [
   {
+    id: 'kubernetes-controller-roles',
+    // https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/
+    // https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/
+    match: /daemon\s*set|stateful\s*set/iu,
+    guidance: ['DaemonSet запускает по поду на каждом подходящем узле, например агент логов. Это не набор взаимозаменяемых реплик приложения. StatefulSet даёт репликам устойчивые имена и связывает каждую с её хранилищем, если настроены тома. IP пода может измениться и у StatefulSet; устойчивой является идентификация, а не IP. Порядок запуска зависит от podManagementPolicy.'],
+    english: ['DaemonSet runs a pod on each eligible node, for example a log agent. StatefulSet gives replicas stable identities and individual storage when volumes are configured. A StatefulSet pod IP can still change. Startup ordering depends on podManagementPolicy. Do not describe DaemonSet as Deployment or promise a fixed IP.'],
+  },
+  {
     id: 'kubectl-purpose',
     // https://kubernetes.io/docs/reference/kubectl/
     match: /kubectl/iu,

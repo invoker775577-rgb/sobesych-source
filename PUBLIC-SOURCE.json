@@ -1,5 +1,5 @@
 {
-  "applicationVersion": "0.5.88",
+  "applicationVersion": "0.5.89",
   "includesUnreleasedFixes": false,
   "hashNormalization": "UTF-8 text CRLF to LF; binary files unchanged",
   "exportPolicy": "Application source and synthetic tests only; no private Git history, profiles, recordings or evidence",
@@ -70,7 +70,7 @@
     },
     {
       "path": "app/electron/local-stt.cjs",
-      "sha256": "67cd0282a38c96ef1446a3673d8942c779a220f06ef9038ba9101340a6825096"
+      "sha256": "94b9ed78e81dea8d1453338a3f027640f839a24ac0ce905ab7a42445944aa29d"
     },
     {
       "path": "app/electron/main.cjs",
@@ -126,11 +126,11 @@
     },
     {
       "path": "app/package-lock.json",
-      "sha256": "540b24e7d5974731d279bb1ee7b5fecf93d05403944b7db56c955d66ac919727"
+      "sha256": "dc194b403eaa8fe9b48b7342d810ecf95e2fa4a4a88d3401d8ae822c09a279ca"
     },
     {
       "path": "app/package.json",
-      "sha256": "8eb2803c16a58d7d167b86d420f04ba80c90c71fc833c23e15a8a6327649baf6"
+      "sha256": "8fdb6acfb3f67a55400c6ac2ec2aaad310d43cb54dd97fe17765a40676846847"
     },
     {
       "path": "app/public/favicon.svg",
@@ -222,7 +222,7 @@
     },
     {
       "path": "app/src/copilot.mjs",
-      "sha256": "d0f6e7401dee7bd5a7784e79aa8d9110c1bda2faffa2a633e2031e3770dddd22"
+      "sha256": "095635a67b3885af420f24ef79bc537eda8feb73a3def429683ddcd92e86b0e5"
     },
     {
       "path": "app/src/diagram.d.mts",
@@ -234,7 +234,7 @@
     },
     {
       "path": "app/src/domain-knowledge.mjs",
-      "sha256": "354f03b6d824ddff6bc8d00fcdb19fa0d8a3e6477d50d7d320ec0eee33a2b16d"
+      "sha256": "3784a36b4f1b5015c180cdff9eb137e3e14724dc2048fcb5d349ca71f35c7c9b"
     },
     {
       "path": "app/src/index.css",
@@ -318,7 +318,7 @@
     },
     {
       "path": "app/src/transcript.mjs",
-      "sha256": "df4ee0784abfbbcf7a279cd99a10392c192883f78dbfad6c1df08e8a2888df0f"
+      "sha256": "e67005830563e3675f4c072424c70eac8f453680c6747efc3cb67b0c545eac02"
     },
     {
       "path": "app/src/types.ts",
@@ -362,7 +362,7 @@
     },
     {
       "path": "app/tests/copilot.test.mjs",
-      "sha256": "45804f1ada5ae623461d40f4c071680df7560f5155a0b6c3615f89d6ed12ad1c"
+      "sha256": "8b5e9fada448977cccfe929f5af689dabbe6d8365839cc2279fa3e220168f91e"
     },
     {
       "path": "app/tests/generic-answers.test.mjs",
@@ -418,7 +418,7 @@
     },
     {
       "path": "app/tests/technical-desktop.mjs",
-      "sha256": "c78dc232eebebc7a96e69901dbe68282676545594a0e0013f99af53b1a7dc8f3"
+      "sha256": "a1bce50888521aaa7091b74345db8f60119bf25b6172ee574c00599382af9d38"
     },
     {
       "path": "app/tests/technical-runtime.mjs",
@@ -462,7 +462,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "5a2dd47245a592e92278840788d63cefe399cc027398207773c52a2ee958dc5e"
+      "sha256": "2d75698f568e114137acc8f0df4b60af6cff468312d239d1973e15e268ac7a60"
     },
     {
       "path": "SECURITY.md",

@@ -38,6 +38,11 @@ export function normalizeTranscriptText(value = '') {
     .replace(/\bin\s+the[.,]?\s+og\s+hvað\s+company\b/giu, 'in your previous company')
     .trim()
   const hasGoogleCloudContext = /\b(?:GCP|Cloud Run|Cloud SQL|Google Cloud Platform)\b/i.test(text)
+  // Repair this observed speech confusion only in a Kubernetes controller comparison.
+  // Manual text bypasses this function; quoted literals remain untouched.
+  if (!/["'«»]/u.test(text) && /stateful\s*set/iu.test(text) && /отлич|разниц|сравн|differ|compar|versus|\bvs\b/iu.test(text)) {
+    text = text.replace(/\bdiamond\s+set\b/giu, 'DaemonSet')
+  }
   const hasStorageContext = /\b(?:Cloud Storage|storage|bucket|buckets|object storage|file storage)\b|(?:бакет|хранилищ|объект|файл)\p{L}*/iu.test(text)
   const hasLinuxOpsContext = /\b(?:Linux|Ubuntu|sysctl|kernel|hardening|tuning)\b|линукс|убунту|ядр\p{L}*|хардинг\p{L}*|тюнинг\p{L}*/iu.test(text)
   const hasNetworkContext = /\b(?:VPN|WireGuard|WireGlass|network)\b|сет\p{L}*|туннел\p{L}*|маршрут\p{L}*/iu.test(text)
@@ -203,6 +208,9 @@ export function isExperienceQuestion(text = '') {
 }
 
 const personalStoryPatterns = [
+  /(?:как(?:ой|ая|ое|ую|ие)|что\s+за).{0,40}(?:последн\p{L}*|недавн\p{L}*).{0,30}(?:кейс\p{L}*|инцидент\p{L}*|задач\p{L}*|проект\p{L}*|случа\p{L}*|сэмпл\p{L}*)/iu,
+  /(?:как(?:ой|ая|ое|ую|ие)|что\s+за).{0,20}(?:у\s+(?:вас|тебя)|ваш\p{L}*|тво[йяею]\p{L}*).{0,30}(?:кейс\p{L}*|инцидент\p{L}*|задач\p{L}*)/iu,
+  /(?:what|which).{0,46}(?:last|latest|recent).{0,35}(?:case|incident|task|project|example)\b/iu,
   /(?:describe|tell|share|give).{0,80}(?:conflict|disagreement|example of (?:using|working)|situation (?:where|when))/iu,
   /(?:tell\s+me\s+about|describe)\s+your\s+(?:(?:last|latest|recent)\s+)?(?:task|case|project|incident|work)\b/iu,
   /^(?:(?:ну|а|и|давай)[,\s]+)?кейсы?[,\s]+как\s+(?:ты|вы)(?=$|[^\p{L}\p{N}_])/iu,

@@ -189,12 +189,12 @@ try {
   assert.deepEqual(errors, [])
   console.log('PASS history survives reload; packaged DOCX/PDF readers extract synthetic text and reject oversized text')
   for (const [root, more, why, next] of [
-    ['Расскажи про какой-то свой инцидент последний, связанный с Кубером. Что делал? Вообще в чем была ситуация?', 'А подробнее?', 'Почему выбрал такое решение?', 'Что такое DNS?'],
-    ['Describe a conflict with a colleague. How did you handle it?', 'Can you give more details?', 'Why did you choose that solution?', 'What is DNS?'],
+    ['Какой у вас последний кейс, связанный с CI/CD?', 'А подробнее?', 'Почему выбрал такое решение?', 'Что такое DNS?'],
+    ['What was your latest CI/CD incident?', 'Can you give more details?', 'Why did you choose that solution?', 'What is DNS?'],
   ]) {
-    for (const [step, question] of [root, more, why, root.startsWith('Describe') ? 'What did you do personally?' : 'Что сделал лично?', root.startsWith('Describe') ? 'What was the outcome?' : 'Чем всё закончилось?', next].entries()) {
-      const marker = `CASE_BUTTON_${root.startsWith('Describe') ? 'EN' : 'RU'}_${step}`
-      plans.push({ text: `:::kind general\n:::answer\n${step === 0 ? root.startsWith('Describe') ? 'Example scenario. ' : 'Пример кейса. ' : ''}${marker}` })
+    for (const [step, question] of [root, more, why, /^[A-Z]/.test(root) ? 'What did you do personally?' : 'Что сделал лично?', /^[A-Z]/.test(root) ? 'What was the outcome?' : 'Чем всё закончилось?', next].entries()) {
+      const marker = `CASE_BUTTON_${/^[A-Z]/.test(root) ? 'EN' : 'RU'}_${step}`
+      plans.push({ text: `:::kind general\n:::answer\n${step === 0 ? /^[A-Z]/.test(root) ? 'Example scenario. ' : 'Пример кейса. ' : ''}${marker}` })
       await addQuestion(question); await ask()
       await page.locator('.answer .spoken-answer').getByText(marker, { exact: true }).waitFor()
       const payload = received.at(-1)

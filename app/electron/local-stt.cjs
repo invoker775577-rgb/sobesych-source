@@ -4,7 +4,7 @@ const net = require('node:net')
 const { spawn } = require('node:child_process')
 const os = require('node:os')
 
-const vocabularyHint = 'Обсуждаем SQL JOIN, INNER JOIN и LEFT JOIN, Greenplum и PostgreSQL. Техническое собеседование. Kubernetes, Docker, Terraform, Ansible Vault, Kafka, gRPC.'
+const vocabularyHint = 'Обсуждаем SQL JOIN, INNER JOIN и LEFT JOIN, Greenplum и PostgreSQL. Техническое собеседование. Kubernetes, DaemonSet, StatefulSet, Docker, CI/CD, Terraform, Ansible Vault, Kafka, gRPC.'
 
 function shouldUseLocalTranscription(forceLocal, transcriptionMode) {
   return forceLocal === true || transcriptionMode === 'local'

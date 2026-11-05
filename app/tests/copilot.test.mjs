@@ -277,3 +277,44 @@ test('illustrative labels remain metadata instead of spoken text in RU and EN', 
   assert.match(code.details, /Example scenario/)
   assert.equal(code.illustrative, undefined)
 })
+
+test('recent case questions reach the detailed scenario contract without tell/describe verbs', async () => {
+  const sent = []
+  const service = createService({ getSettings: () => resolveSettings({ apiKey: 'fixture' }), fetchImpl: async (_url, options) => {
+    sent.push(JSON.parse(options.body))
+    return Response.json({ choices: [{ message: { content: ':::kind general\n:::answer\nПример кейса. FIXTURE' } }] })
+  } })
+  for (const [question, english] of [
+    ['Какой у вас последний кейс, связанный с CI/CD?', false],
+    ['Какой последний сэмпл связан с CI/CD?', false],
+    ['Какая у тебя последняя задача с Docker?', false],
+    ['What was your latest CI/CD incident?', true],
+    ['Which recent project did you work on?', true],
+  ]) {
+    const input = { mode: 'answer', presentation: 'layered', messages: [ask(question)] }
+    const request = copilotRequest(input, english, [])
+    assert.match(request.system, /7-9/)
+    assert.match(request.system, english ? /90-120 words/ : /110-150 слов/)
+    assert.match(request.system, /whole spoken reply under (120|150) words/)
+    assert.doesNotMatch(request.system, /\$\{/)
+    await service.assist(input)
+    const system = sent.at(-1).messages[0].content
+    assert.match(system, /7-9/)
+    assert.match(system, /AI identity and biography checks are outside/)
+    assert.match(sent.at(-1).messages[1].content, /CI\/CD|Docker|project/)
+  }
+  for (const question of ['Что такое CI/CD?', 'Какой последний этап пайплайна?', 'What is a Kubernetes incident?', 'What is the latest Kubernetes version?']) {
+    assert.doesNotMatch(copilotRequest({ messages: [ask(question)] }, true, []).system, /7-9/)
+  }
+})
+
+test('controller comparisons supply role and identity facts in both response languages', () => {
+  for (const english of [false, true]) {
+    const question = english ? 'How does Diamond Set differ from StatefulSet?' : 'Чем отличается Diamond Set от Stateful Set?'
+    const request = copilotRequest({ messages: [{ ...ask(question), origin: 'speech' }] }, english, [])
+    assert.match(request.context, /DaemonSet/)
+    assert.match(request.context, english ? /each eligible node/ : /каждом подходящем узле/)
+    assert.match(request.context, english ? /IP can still change/ : /IP пода может измениться/)
+    assert.doesNotMatch(request.context, /Diamond Set/)
+  }
+})
