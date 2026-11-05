@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { latestInterviewerMessage, localSocialReply, isCodeRequest, isCodeChangeRequest, isProseChangeRequest, isDiagnosticQuestion, isExperienceQuestion, isPersonalStoryQuestion, isLikelyInterviewQuestion, isTranscriptNoise, normalizeTranscriptText, normalizeMessageText } from './src/transcript.mjs'
 import { lookupDomainKnowledge } from './src/domain-knowledge.mjs'
 import { visiblePracticeReport } from './src/practice-score.mjs'
-import { activeTask, copilotRequest } from './src/copilot.mjs'
+import { activeTask, copilotRequest, humanReplyRule, workExampleTask } from './src/copilot.mjs'
 import { createCallBudget } from './src/call-budget.mjs'
 
 export const defaults = {
@@ -18,11 +18,6 @@ export function textOr(value, fallback = '') {
 }
 function requestsWorkExample(question) {
   return isExperienceQuestion(question) || isPersonalStoryQuestion(question) || isPracticeExampleQuestion(question)
-}
-function workExampleTask(question, english) {
-  return english
-    ? `Answer this request with one practical example: "${question}". Start with "Example scenario." and use "I would" for invented actions. Give a small app or project, a specific problem and goal, 2-3 concrete actions, and how to check the result. Use 5-7 short A1-A2 sentences, about 75-100 words. Stay on the requested topic. Do not invent a real employer, personal history or measurements. No biography preface, headings, lists, colon or long dash.`
-    : `Ответь на запрос одним практическим примером: "${question}". Начни словами "Пример кейса." и используй "я бы" для придуманных действий. Опиши небольшой сервис или проект, конкретную проблему и цель, 2-3 действия и как проверить результат. Дай 5-7 простых разговорных предложений, примерно 85-115 слов. Оставайся в теме вопроса. Не придумывай настоящего работодателя, личную биографию или замеры. Без вступления о биографии, заголовков, списков, двоеточия и длинного тире.`
 }
 export function resolveSettings(input = {}, fallback = {}) {
   const result = { ...defaults }
@@ -679,7 +674,7 @@ export function createService({ getSettings = () => resolveSettings({}, { apiKey
       const codeAnswer = mode === 'answer' && requestsCodeAnswer(lines, latestQuestion)
       const caseAnswer = mode === 'answer' && !visionMode && !codeAnswer && latestQuestion && requestsWorkExample(latestQuestion.text)
       const english = isEnglishQuestion(input)
-      const spokenSystem = `${questionClarityRule} ${questionFocusRule} ${english ? `${englishSystemPrompt} ${englishAccuracyRule}` : `${systemPrompt} ${accuracyRule}`} ${spokenLanguageRule} ${exampleRule}`
+      const spokenSystem = `${humanReplyRule} ${questionClarityRule} ${questionFocusRule} ${english ? `${englishSystemPrompt} ${englishAccuracyRule}` : `${systemPrompt} ${accuracyRule}`} ${spokenLanguageRule} ${exampleRule}`
       const codeContext = codeAnswer ? previousCodeContext(lines, latestQuestion) : null
       const numericIdentifierRule = enhanced && ['code', 'screen'].includes(enhanced.kind) ? unclearNumericIdentifierRule(enhanced.turns) : codeAnswer ? unclearNumericIdentifierRule(codeContext?.turns || conversationContext(lines, mode, latestQuestion, 12_000)) : ''
       const defaultMaxTokens = enhanced?.maxTokens || (screenFollowup ? tokenLimits.screen : codeAnswer ? tokenLimits.code : caseAnswer ? english ? 320 : 600 : mode === 'answer' ? english ? 240 : 430 : tokenLimits[mode] || tokenLimits.answer)

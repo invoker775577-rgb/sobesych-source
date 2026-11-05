@@ -203,6 +203,7 @@ export function isExperienceQuestion(text = '') {
 }
 
 const personalStoryPatterns = [
+  /(?:describe|tell|share|give).{0,80}(?:conflict|disagreement|example of (?:using|working)|situation (?:where|when))/iu,
   /(?:tell\s+me\s+about|describe)\s+your\s+(?:(?:last|latest|recent)\s+)?(?:task|case|project|incident|work)\b/iu,
   /^(?:(?:ну|а|и|давай)[,\s]+)?кейсы?[,\s]+как\s+(?:ты|вы)(?=$|[^\p{L}\p{N}_])/iu,
   /(?:расскаж\p{L}*|опиши\p{L}*).{0,48}кейс\p{L}*/iu,
@@ -221,7 +222,9 @@ const personalStoryPatterns = [
 
 export function isPersonalStoryQuestion(value = '') {
   const question = normalizeTranscriptText(value)
-  return personalStoryPatterns.some(pattern => pattern.test(question))
+  if (/^(?:explain|describe)\s+what\s+(?:an?|the)\s+.{0,50}\s+is(?:\s|[.!?]|$)/iu.test(question)) return false
+  if (/^(?:(?:расскажи(?:те)?|объясни(?:те)?|explain|describe)\s+)?(?:что\s+такое|как\s+работает|what\s+(?:is|are)|how\s+.+?\s+works)(?:\s|[?!,.]|$)/iu.test(question)) return false
+  return /(?:расскаж\p{L}*|опиш\p{L}*|привед\p{L}*).{0,100}(?:инцидент\p{L}*|кейс\p{L}*|случа[йяею]\p{L}*)|(?:tell|describe|share|give).{0,80}(?:incident|work example|production issue)/iu.test(question) || personalStoryPatterns.some(pattern => pattern.test(question))
 }
 
 export function isDiagnosticQuestion(text = '') {

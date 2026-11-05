@@ -1,5 +1,13 @@
 const TOPICS = [
   {
+    id: 'kubernetes-lifecycle-memory',
+    // https://kubernetes.io/docs/concepts/workloads/controllers/deployment/
+    // https://kubernetes.io/docs/tasks/configure-pod-container/assign-memory-resource/
+    match: /kubernetes|k8s|кубер|OOMKilled|CrashLoopBackOff/iu,
+    guidance: ['Deployment управляет ReplicaSet, ReplicaSet создаёт Pod. kube-scheduler назначает spec.nodeName, а не метку. Kubelet запускает контейнер через runtime.', 'Процесс завершает OOM killer ядра Linux, не он сам и не kubelet. OOMKilled сам по себе не доказывает утечку или неверный лимит. OOMKilled проверяют в статусе завершённого контейнера через kubectl describe pod или status.lastState; в логах приложения этой записи может не быть. Running не доказывает готовность и устранение сбоя. Сравнивают readiness, рестарты, память и реальные запросы за период нагрузки. Увеличение лимита не устраняет утечку памяти; это временная мера с проверкой запаса ноды и последующей диагностикой.'],
+    english: ['Deployment manages ReplicaSets; ReplicaSet creates Pods. The scheduler assigns spec.nodeName, not a label. Kubelet starts containers through the runtime.', 'The Linux kernel OOM killer terminates the process, not the process itself or kubelet. OOMKilled alone proves neither a leak nor a wrong limit. Inspect container termination status with kubectl describe pod or status.lastState for OOMKilled; it need not appear in app logs. Running alone proves neither readiness nor recovery. Check readiness, restarts, memory and real requests over a representative load period. Raising a memory limit does not fix a memory leak; it is a temporary mitigation requiring node capacity checks and diagnosis.'],
+  },
+  {
     id: 'ai-evidence',
     // https://sbert.net/docs/sentence_transformer/usage/semantic_textual_similarity.html
     // https://cloud.google.com/vertex-ai/generative-ai/docs/models/evaluation-overview

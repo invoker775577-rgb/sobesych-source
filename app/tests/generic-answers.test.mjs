@@ -107,3 +107,74 @@ test('profile metadata remains recoverable and opaque without changing a locked 
     rmSync(backups, { recursive: true, force: true })
   }
 })
+
+ test('colloquial incident requests select an illustrative work scenario', async () => {
+  const { isPersonalStoryQuestion } = await import('../src/transcript.mjs')
+  const { copilotRequest } = await import('../src/copilot.mjs')
+  for (const question of ['Расскажи про какой-то свой инцидент последний, связанный с Кубером. Что делал? Вообще в чем была ситуация?', 'Расскажи про свой последний инцидент', 'Tell me about your last Kubernetes incident.', 'Расскажите про конфликтную ситуацию на работе', 'Расскажи какой-нибудь кейс с Zabbix', 'Describe a conflict with a colleague.', 'Give me an example of using Zabbix.']) {
+    assert.equal(isPersonalStoryQuestion(question), true, question)
+    const request = copilotRequest({ messages: [interviewer(question)], mode: 'answer' })
+    assert.match(request.system, /not a reply about yourself/)
+    assert.match(request.system, /clearly labelled illustrative scenario/)
+  }
+})
+
+test('provider payload uses the same human reply role for legacy and layered case chains', async () => {
+  const { humanReplyRule } = await import('../src/copilot.mjs')
+  let payload
+  const service = createService({ getSettings: () => resolveSettings({ apiKey: 'fixture-key' }), fetchImpl: async (_url, options) => {
+    payload = JSON.parse(options.body)
+    return { ok: true, json: async () => ({ choices: [{ message: { content: 'Fixture' } }] }) }
+  } })
+  for (const presentation of [undefined, 'layered']) for (const english of [false, true]) {
+    const question = english ? 'Tell me about your last Kubernetes incident. What happened?' : 'Расскажи про какой-то свой инцидент последний, связанный с Кубером. Что делал? Вообще в чем была ситуация?'
+    const messages = [interviewer(question)]
+    await service.assist({ mode: 'answer', presentation, messages })
+    assert.ok(payload.messages[0].content.includes(humanReplyRule))
+    assert.match(JSON.stringify(payload.messages), english ? /2-3 concrete actions/ : /2-3 действия/)
+    const draft = english ? 'Example scenario. I would check the ticket app. SCENARIO_ANCHOR.' : 'Пример кейса. Я бы проверил сервис заявок. SCENARIO_ANCHOR.'
+    const continuation = [...messages, { speaker: 'assistant', text: draft }, interviewer(english ? 'Can you give more details?' : 'А подробнее?')]
+    await service.assist({ mode: 'answer', presentation, messages: continuation })
+    assert.match(JSON.stringify(payload.messages), /SCENARIO_ANCHOR/)
+    assert.match(JSON.stringify(payload.messages), /SAME illustrative scenario|Keep its scenario|Сохрани ситуацию/)
+    await service.assist({ mode: 'answer', presentation, messages: [...continuation, { speaker: 'assistant', text: draft }, interviewer(english ? 'Why did you choose that solution?' : 'Почему выбрал такое решение?')] })
+    assert.match(JSON.stringify(payload.messages), /SCENARIO_ANCHOR/)
+    await service.assist({ mode: 'answer', presentation, messages: [...continuation, interviewer(english ? 'What is DNS?' : 'Что такое DNS?')] })
+    assert.doesNotMatch(JSON.stringify(payload.messages), /SCENARIO_ANCHOR/)
+  }
+})
+
+test('incident definitions do not trigger an invented work story', async () => {
+  const { isPersonalStoryQuestion } = await import('../src/transcript.mjs')
+  for (const question of ['Расскажи что такое инцидент.', 'Describe what an incident is.', 'What is incident management?']) assert.equal(isPersonalStoryQuestion(question), false)
+})
+
+test('short personal-action and outcome follow-ups retain the active case across RU and EN', async () => {
+  const { activeTask } = await import('../src/copilot.mjs')
+  for (const question of ['Что сделал лично?', 'Что ты сделал?', 'Чем всё закончилось?', 'Как проверил результат?', 'What did you do personally?', 'What was the outcome?', 'What did you learn?', 'Какой был эффект?', 'Что оказалось сложнее всего?', 'What was the impact?', 'How did that affect users?']) {
+    const task = activeTask([interviewer('Расскажи свой последний инцидент с Kubernetes.'), { speaker: 'assistant', text: 'Пример кейса. SCENARIO_ANCHOR' }, interviewer(question)])
+    assert.match(task.draft, /SCENARIO_ANCHOR/, question)
+  }
+})
+
+test('a separate topic ends the conversational case fallback', async () => {
+  const { activeTask } = await import('../src/copilot.mjs')
+  const task = activeTask([interviewer('Расскажи свой последний инцидент с Kubernetes.'), { speaker: 'assistant', text: 'Пример кейса. SCENARIO_ANCHOR' }, interviewer('Что такое DNS?'), { speaker: 'assistant', text: 'DNS maps names to addresses.' }, interviewer('What was the impact?')])
+  assert.doesNotMatch(JSON.stringify(task), /SCENARIO_ANCHOR/)
+})
+
+test('complete diagnostic questions do not become case continuations', async () => {
+  const { activeTask } = await import('../src/copilot.mjs')
+  for (const question of ['How would you debug a failed Terraform deployment?', 'Как настроить Nginx?']) {
+    const task = activeTask([interviewer('Расскажи свой последний инцидент с Kubernetes.'), { speaker: 'assistant', text: 'Пример кейса. SCENARIO_ANCHOR' }, interviewer(question)])
+    assert.doesNotMatch(JSON.stringify(task), /SCENARIO_ANCHOR/)
+  }
+})
+
+test('uncertain conversational continuation is background rather than a forced story', async () => {
+  const { copilotRequest } = await import('../src/copilot.mjs')
+  const request = copilotRequest({ mode: 'answer', messages: [interviewer('Расскажи свой последний инцидент с Kubernetes.'), { speaker: 'assistant', text: 'Пример кейса. SCENARIO_ANCHOR' }, interviewer('What was the impact?')] }, true)
+  assert.equal(request.caseBackground, true)
+  assert.match(request.context, /SCENARIO_ANCHOR/)
+  assert.match(request.system, /not a constraint on an independent factual question/)
+})
