@@ -304,7 +304,7 @@ test('recent case questions reach the detailed scenario contract without tell/de
     assert.match(sent.at(-1).messages[1].content, /CI\/CD|Docker|project/)
   }
   for (const question of ['Что такое CI/CD?', 'Какой последний этап пайплайна?', 'What is a Kubernetes incident?', 'What is the latest Kubernetes version?']) {
-    assert.doesNotMatch(copilotRequest({ messages: [ask(question)] }, true, []).system, /7-9/)
+    assert.match(copilotRequest({ messages: [ask(question)] }, true, []).system, /Otherwise leave this contract unused/)
   }
 })
 
@@ -316,5 +316,16 @@ test('controller comparisons supply role and identity facts in both response lan
     assert.match(request.context, english ? /each eligible node/ : /каждом подходящем узле/)
     assert.match(request.context, english ? /IP can still change/ : /IP пода может измениться/)
     assert.doesNotMatch(request.context, /Diamond Set/)
+  }
+})
+
+test('work-example instructions are always available without classifier activation', () => {
+  for (const [question, english] of [['А из недавнего что запомнилось с релизами?', false], ['Anything memorable from a recent release?', true], ['Что такое kubectl?', false], ['Explain a binary tree.', true]]) {
+    const request = copilotRequest({ messages: [ask(question)] }, english, [])
+    assert.match(request.system, /Always-available work-example contract/)
+    assert.match(request.system, english ? /90-120 words/ : /110-150 слов/)
+    assert.match(request.system, /Otherwise leave this contract unused/)
+    assert.match(request.system, /For a factual explanation use 3-5/)
+    assert.match(request.context, new RegExp(question.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))
   }
 })
